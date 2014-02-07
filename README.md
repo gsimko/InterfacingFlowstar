@@ -15,8 +15,3 @@ In order to compile Flow*, the following libraries are needed:
   - gsl
   - glpk
  
-The binary files were produced using 32-bit MinGW and G++ 4.8.1 with the following libs:
-  - gmp 5.1.3
-  - mpfr 3.1.2
-  - gsl 1.9
-  - glpk 4.52
