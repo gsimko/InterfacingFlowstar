@@ -3,6 +3,10 @@
   Authors: Xin Chen, Erika Abraham and Sriram Sankaranarayanan.
   Email: Xin Chen <xin.chen@cs.rwth-aachen.de> if you have questions or comments.
 
+  Modification: Modified ContinuousSystem::reach...() functions. 1. Added exceptions to handle the case when no valid remainder intervals can be found. 2. Added iterative remainder interval estimation.
+  Author: Gabor Simko
+  Date: 2/18/2014. 
+  
   The code is released as is under the GNU General Public License (GPL). Please consult the file LICENSE.txt for
   further information.
 ---*/
@@ -266,7 +270,7 @@ void Flowpipe::normalize()
 	for(int i=0; i<tmvPre.tms.size(); ++i)
 	{
 		TaylorModel tmTemp;
-		tmvPre.tms[i].insert_no_remainder_no_rounding(tmTemp, newVars, rangeDim+1, tmvPre.tms[i].degree());
+		tmvPre.tms[i].insert_no_remainder_no_cutoff(tmTemp, newVars, rangeDim+1, tmvPre.tms[i].degree());
 		tmvPre.tms[i].expansion = tmTemp.expansion;
 	}
 }
@@ -336,7 +340,7 @@ bool Flowpipe::advance_low_degree(Flowpipe & result, const vector<HornerForm> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -568,7 +572,7 @@ bool Flowpipe::advance_low_degree(Flowpipe & result, const vector<HornerForm> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -793,7 +797,7 @@ bool Flowpipe::advance_low_degree(Flowpipe & result, const vector<HornerForm> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -914,7 +918,7 @@ bool Flowpipe::advance_low_degree(Flowpipe & result, const vector<HornerForm> & 
 	for(; !bfound;)
 	{
 		bfound = true;
-		double newStep = step_exp_table[1].sup() * LAMBDA;	// contract the time step size
+		double newStep = step_exp_table[1].sup() * LAMBDA_DOWN;	// reduce the time step size
 
 		if(newStep < miniStep)
 		{
@@ -1060,7 +1064,7 @@ bool Flowpipe::advance_low_degree(Flowpipe & result, const vector<HornerForm> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -1181,7 +1185,7 @@ bool Flowpipe::advance_low_degree(Flowpipe & result, const vector<HornerForm> & 
 	for(; !bfound;)
 	{
 		bfound = true;
-		double newStep = step_exp_table[1].sup() * LAMBDA;	// contract the time step size
+		double newStep = step_exp_table[1].sup() * LAMBDA_DOWN;	// reduce the time step size
 
 		if(newStep < miniStep)
 		{
@@ -1328,7 +1332,7 @@ bool Flowpipe::advance_low_degree(Flowpipe & result, const vector<HornerForm> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -1602,7 +1606,7 @@ bool Flowpipe::advance_low_degree(Flowpipe & result, const vector<HornerForm> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -1776,7 +1780,7 @@ bool Flowpipe::advance_low_degree(Flowpipe & result, const vector<HornerForm> & 
 		}
 
 		// increase the approximation orders
-		x.Picard_no_remainder_assign(x0, ode, rangeDim+1, newOrders);
+		x.Picard_no_remainder_assign(x0, ode, rangeDim+1, newOrders, bIncreased);
 
 		for(int i=0; i<rangeDim; ++i)	// apply the estimation again
 		{
@@ -1973,7 +1977,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -2044,7 +2048,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 	for(int i=0; i<rangeDim; ++i)
 	{
 		TaylorModel tmTemp;
-		ode[i].insert_no_remainder(tmTemp, c_plus_Ar, rangeDim+1, order);
+		ode[i].insert_no_remainder(tmTemp, c_plus_Ar, rangeDim+1, order - 1);
 		Adrdt.tms.push_back(tmTemp);
 	}
 
@@ -2228,7 +2232,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -2301,7 +2305,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 	for(int i=0; i<rangeDim; ++i)
 	{
 		TaylorModel tmTemp;
-		ode[i].insert_no_remainder(tmTemp, c_plus_Ar, rangeDim+1, orders[i]);
+		ode[i].insert_no_remainder(tmTemp, c_plus_Ar, rangeDim+1, orders[i] - 1);
 		Adrdt.tms.push_back(tmTemp);
 	}
 	Adrdt.sub_assign(dcdt);
@@ -2482,7 +2486,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -2553,7 +2557,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 	for(int i=0; i<rangeDim; ++i)
 	{
 		TaylorModel tmTemp;
-		ode[i].insert_no_remainder(tmTemp, c_plus_Ar, rangeDim+1, order);
+		ode[i].insert_no_remainder(tmTemp, c_plus_Ar, rangeDim+1, order - 1);
 		Adrdt.tms.push_back(tmTemp);
 	}
 
@@ -2631,7 +2635,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 	for(; !bfound;)
 	{
 		bfound = true;
-		double newStep = step_exp_table[1].sup() * LAMBDA;	// contract the time step size
+		double newStep = step_exp_table[1].sup() * LAMBDA_DOWN;	// reduce the time step size
 
 		if(newStep < miniStep)
 		{
@@ -2777,7 +2781,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -2848,7 +2852,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 	for(int i=0; i<rangeDim; ++i)
 	{
 		TaylorModel tmTemp;
-		ode[i].insert_no_remainder(tmTemp, c_plus_Ar, rangeDim+1, orders[i]);
+		ode[i].insert_no_remainder(tmTemp, c_plus_Ar, rangeDim+1, orders[i] - 1);
 		Adrdt.tms.push_back(tmTemp);
 	}
 
@@ -2926,7 +2930,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 	for(; !bfound;)
 	{
 		bfound = true;
-		double newStep = step_exp_table[1].sup() * LAMBDA;	// contract the time step size
+		double newStep = step_exp_table[1].sup() * LAMBDA_DOWN;	// reduce the time step size
 
 		if(newStep < miniStep)
 		{
@@ -3073,7 +3077,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -3144,7 +3148,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 	for(int i=0; i<rangeDim; ++i)
 	{
 		TaylorModel tmTemp;
-		ode[i].insert_no_remainder(tmTemp, c_plus_Ar, rangeDim+1, order);
+		ode[i].insert_no_remainder(tmTemp, c_plus_Ar, rangeDim+1, order - 1);
 		Adrdt.tms.push_back(tmTemp);
 	}
 
@@ -3374,7 +3378,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -3447,7 +3451,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 	for(int i=0; i<rangeDim; ++i)
 	{
 		TaylorModel tmTemp;
-		ode[i].insert_no_remainder(tmTemp, c_plus_Ar, rangeDim+1, orders[i]);
+		ode[i].insert_no_remainder(tmTemp, c_plus_Ar, rangeDim+1, orders[i] - 1);
 		Adrdt.tms.push_back(tmTemp);
 	}
 
@@ -3578,7 +3582,7 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 		}
 
 		// increase the approximation orders
-		x.Picard_no_remainder_assign(x0, ode, rangeDim+1, newOrders);
+		x.Picard_no_remainder_assign(x0, ode, rangeDim+1, newOrders, bIncreased);
 
 		for(int i=0; i<rangeDim; ++i)	// apply the estimation again
 		{
@@ -3703,10 +3707,10 @@ bool Flowpipe::advance_high_degree(Flowpipe & result, const vector<HornerForm> &
 
 
 
-// integration scheme for non-polynomial ODEs
+// integration scheme for non-polynomial ODEs (using Taylor approximations)
 // fixed step sizes and orders
 
-bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const int order, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const
+bool Flowpipe::advance_non_polynomial_taylor(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const int order, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const
 {
 	int rangeDim = strOde.size();
 	Interval intZero, intOne(1,1), intUnit(-1,1);
@@ -3768,7 +3772,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -3812,7 +3816,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	TaylorModelVec c = c0;
 	for(int i=1; i<=order; ++i)
 	{
-		c.Picard_non_polynomial_no_remainder_assign(c0, strOde, i, uncertainty_centers);	// compute c(t)
+		c.Picard_non_polynomial_taylor_no_remainder_assign(c0, strOde, i, uncertainty_centers);	// compute c(t)
 	}
 
 	TaylorModelVec dcdt;
@@ -3837,7 +3841,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	// compute the Taylor expansion of the ODE of A*r(t)
 
 	parseSetting.clear();
-	parseSetting.order = order;
+	parseSetting.order = order - 1;
 	parseSetting.flowpipe = c_plus_Ar;
 
 	string prefix(str_prefix_taylor_polynomial);
@@ -3885,7 +3889,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	}
 
 	TaylorModelVec tmvTemp;
-	x.Picard_non_polynomial_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, order, uncertainty_centers);
+	x.Picard_non_polynomial_taylor_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, order, uncertainty_centers);
 
 	// compute the interval evaluation of the polynomial difference, this part is not able to be reduced by Picard iteration
 	vector<Interval> intDifferences;
@@ -3932,7 +3936,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 		bfinished = true;
 
 		vector<Interval> newRemainders;
-		x.Picard_non_polynomial_only_remainder(newRemainders, x0, strOde, step_exp_table[1]);
+		x.Picard_non_polynomial_taylor_only_remainder(newRemainders, x0, strOde, step_exp_table[1], order);
 
 		for(int i=0; i<rangeDim; ++i)
 		{
@@ -3948,7 +3952,6 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 
 		for(int i=0; i<rangeDim; ++i)
 		{
-
 			if(newRemainders[i].subseteq(x.tms[i].remainder))
 			{
 				if(x.tms[i].remainder.widthRatio(newRemainders[i]) <= STOP_RATIO)
@@ -3973,7 +3976,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	return true;
 }
 
-bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const vector<int> & orders, const int globalMaxOrder, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const
+bool Flowpipe::advance_non_polynomial_taylor(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const vector<int> & orders, const int globalMaxOrder, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const
 {
 	int rangeDim = strOde.size();
 	Interval intZero, intOne(1,1), intUnit(-1,1);
@@ -4035,7 +4038,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -4079,7 +4082,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	TaylorModelVec c = c0;
 	for(int i=1; i<=globalMaxOrder; ++i)
 	{
-		c.Picard_non_polynomial_no_remainder_assign(c0, strOde, i, uncertainty_centers);	// compute c(t)
+		c.Picard_non_polynomial_taylor_no_remainder_assign(c0, strOde, i, uncertainty_centers);	// compute c(t)
 	}
 
 	TaylorModelVec dcdt;
@@ -4113,7 +4116,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		parseSetting.strODE = prefix + strOde[i] + suffix;
-		parseSetting.order = orders[i];
+		parseSetting.order = orders[i] - 1;
 
 		parseODE();		// call the parser
 
@@ -4152,7 +4155,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	}
 
 	TaylorModelVec tmvTemp;
-	x.Picard_non_polynomial_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, orders, uncertainty_centers);
+	x.Picard_non_polynomial_taylor_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, orders, uncertainty_centers);
 
 	// compute the interval evaluation of the polynomial difference, this part is not able to be reduced by Picard iteration
 	vector<Interval> intDifferences;
@@ -4199,7 +4202,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 		bfinished = true;
 
 		vector<Interval> newRemainders;
-		x.Picard_non_polynomial_only_remainder(newRemainders, x0, strOde, step_exp_table[1]);
+		x.Picard_non_polynomial_taylor_only_remainder(newRemainders, x0, strOde, step_exp_table[1], orders);
 
 		for(int i=0; i<rangeDim; ++i)
 		{
@@ -4215,7 +4218,6 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 
 		for(int i=0; i<rangeDim; ++i)
 		{
-
 			if(newRemainders[i].subseteq(x.tms[i].remainder))
 			{
 				if(x.tms[i].remainder.widthRatio(newRemainders[i]) <= STOP_RATIO)
@@ -4242,7 +4244,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 
 
 // adaptive step sizes and fixed orders
-bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const double step, const double miniStep, const int order, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const
+bool Flowpipe::advance_non_polynomial_taylor(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const double step, const double miniStep, const int order, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const
 {
 	int rangeDim = strOde.size();
 	Interval intZero, intOne(1,1), intUnit(-1,1);
@@ -4304,7 +4306,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -4348,7 +4350,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	TaylorModelVec c = c0;
 	for(int i=1; i<=order; ++i)
 	{
-		c.Picard_non_polynomial_no_remainder_assign(c0, strOde, i, uncertainty_centers);	// compute c(t)
+		c.Picard_non_polynomial_taylor_no_remainder_assign(c0, strOde, i, uncertainty_centers);	// compute c(t)
 	}
 
 	TaylorModelVec dcdt;
@@ -4374,7 +4376,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 
 	parseSetting.clear();
 	parseSetting.flowpipe = c_plus_Ar;
-	parseSetting.order = order;
+	parseSetting.order = order - 1;
 
 	string prefix(str_prefix_taylor_polynomial);
 	string suffix(str_suffix);
@@ -4426,7 +4428,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	}
 
 	TaylorModelVec tmvTemp;
-	x.Picard_non_polynomial_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, order, uncertainty_centers);
+	x.Picard_non_polynomial_taylor_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, order, uncertainty_centers);
 
 	// compute the interval evaluation of the polynomial difference, this part is not able to be reduced by Picard iteration
 	vector<Interval> intDifferences;
@@ -4460,7 +4462,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	for(; !bfound;)
 	{
 		bfound = true;
-		double newStep = step_exp_table[1].sup() * LAMBDA;	// contract the time step size
+		double newStep = step_exp_table[1].sup() * LAMBDA_DOWN;	// reduce the time step size
 
 		if(newStep < miniStep)
 		{
@@ -4474,7 +4476,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 			step_uncertainties[i] = step_exp_table[1] * uncertainties[i];
 		}
 
-		x.Picard_non_polynomial_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, order, uncertainty_centers);
+		x.Picard_non_polynomial_taylor_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, order, uncertainty_centers);
 
 		// recompute the interval evaluation of the polynomial differences
 		for(int i=0; i<rangeDim; ++i)
@@ -4509,7 +4511,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 		bfinished = true;
 
 		vector<Interval> newRemainders;
-		x.Picard_non_polynomial_only_remainder(newRemainders, x0, strOde, step_exp_table[1]);
+		x.Picard_non_polynomial_taylor_only_remainder(newRemainders, x0, strOde, step_exp_table[1], order);
 
 		for(int i=0; i<rangeDim; ++i)
 		{
@@ -4543,7 +4545,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	return true;
 }
 
-bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const double step, const double miniStep, const vector<int> & orders, const int globalMaxOrder, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const
+bool Flowpipe::advance_non_polynomial_taylor(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const double step, const double miniStep, const vector<int> & orders, const int globalMaxOrder, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const
 {
 	int rangeDim = strOde.size();
 	Interval intZero, intOne(1,1), intUnit(-1,1);
@@ -4605,7 +4607,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -4649,7 +4651,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	TaylorModelVec c = c0;
 	for(int i=1; i<=globalMaxOrder; ++i)
 	{
-		c.Picard_non_polynomial_no_remainder_assign(c0, strOde, i, uncertainty_centers);	// compute c(t)
+		c.Picard_non_polynomial_taylor_no_remainder_assign(c0, strOde, i, uncertainty_centers);	// compute c(t)
 	}
 
 	TaylorModelVec dcdt;
@@ -4683,7 +4685,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		parseSetting.strODE = prefix + strOde[i] + suffix;
-		parseSetting.order = orders[i];
+		parseSetting.order = orders[i] - 1;
 
 		parseODE();		// call the parser
 
@@ -4727,7 +4729,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	}
 
 	TaylorModelVec tmvTemp;
-	x.Picard_non_polynomial_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, orders, uncertainty_centers);
+	x.Picard_non_polynomial_taylor_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, orders, uncertainty_centers);
 
 	// compute the interval evaluation of the polynomial difference, this part is not able to be reduced by Picard iteration
 	vector<Interval> intDifferences;
@@ -4761,7 +4763,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	for(; !bfound;)
 	{
 		bfound = true;
-		double newStep = step_exp_table[1].sup() * LAMBDA;	// contract the time step size
+		double newStep = step_exp_table[1].sup() * LAMBDA_DOWN;	// reduce the time step size
 
 		if(newStep < miniStep)
 		{
@@ -4775,7 +4777,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 			step_uncertainties[i] = step_exp_table[1] * uncertainties[i];
 		}
 
-		x.Picard_non_polynomial_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, orders, uncertainty_centers);
+		x.Picard_non_polynomial_taylor_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, orders, uncertainty_centers);
 
 		// recompute the interval evaluation of the polynomial differences
 		for(int i=0; i<rangeDim; ++i)
@@ -4810,7 +4812,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 		bfinished = true;
 
 		vector<Interval> newRemainders;
-		x.Picard_non_polynomial_only_remainder(newRemainders, x0, strOde, step_exp_table[1]);
+		x.Picard_non_polynomial_taylor_only_remainder(newRemainders, x0, strOde, step_exp_table[1], orders);
 
 		for(int i=0; i<rangeDim; ++i)
 		{
@@ -4846,7 +4848,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 
 
 // adaptive orders and fixed step sizes
-bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, int & order, const int maxOrder, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const
+bool Flowpipe::advance_non_polynomial_taylor(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, int & order, const int maxOrder, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const
 {
 	int rangeDim = strOde.size();
 	Interval intZero, intOne(1,1), intUnit(-1,1);
@@ -4908,7 +4910,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -4952,7 +4954,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	TaylorModelVec c = c0;
 	for(int i=1; i<=order; ++i)
 	{
-		c.Picard_non_polynomial_no_remainder_assign(c0, strOde, i, uncertainty_centers);	// compute c(t)
+		c.Picard_non_polynomial_taylor_no_remainder_assign(c0, strOde, i, uncertainty_centers);	// compute c(t)
 	}
 
 	TaylorModelVec dcdt;
@@ -4977,7 +4979,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	// compute the Taylor expansion of the ODE of A*r(t)
 
 	parseSetting.clear();
-	parseSetting.order = order;
+	parseSetting.order = order - 1;
 	parseSetting.flowpipe = c_plus_Ar;
 
 	string prefix(str_prefix_taylor_polynomial);
@@ -5025,7 +5027,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	}
 
 	TaylorModelVec tmvTemp;
-	x.Picard_non_polynomial_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, order, uncertainty_centers);
+	x.Picard_non_polynomial_taylor_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, order, uncertainty_centers);
 
 	// compute the interval evaluation of the polynomial difference, this part is not able to be reduced by Picard iteration
 	vector<Interval> intDifferences;
@@ -5068,7 +5070,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 		}
 
 		// increase the approximation orders by 1
-		x.Picard_non_polynomial_no_remainder_assign(x0, strOde, newOrder, uncertainty_centers);
+		x.Picard_non_polynomial_taylor_no_remainder_assign(x0, strOde, newOrder, uncertainty_centers);
 
 		for(int i=0; i<rangeDim; ++i)	// apply the estimation again
 		{
@@ -5076,7 +5078,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 		}
 
 		// compute the Picard operation again
-		x.Picard_non_polynomial_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, newOrder, uncertainty_centers);
+		x.Picard_non_polynomial_taylor_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, newOrder, uncertainty_centers);
 
 		// Update the irreducible part
 		for(int i=0; i<rangeDim; ++i)
@@ -5118,7 +5120,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 		bfinished = true;
 
 		vector<Interval> newRemainders;
-		x.Picard_non_polynomial_only_remainder(newRemainders, x0, strOde, step_exp_table[1]);
+		x.Picard_non_polynomial_taylor_only_remainder(newRemainders, x0, strOde, step_exp_table[1], newOrder);
 
 		// add the uncertainties
 		for(int i=0; i<rangeDim; ++i)
@@ -5154,7 +5156,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	return true;
 }
 
-bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, vector<int> & orders, const int localMaxOrder, const vector<int> & maxOrders, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const
+bool Flowpipe::advance_non_polynomial_taylor(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, vector<int> & orders, const int localMaxOrder, const vector<int> & maxOrders, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const
 {
 	int rangeDim = strOde.size();
 	Interval intZero, intOne(1,1), intUnit(-1,1);
@@ -5216,7 +5218,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Interval intSup;
-		boundOfr0[i].sup(intSup);
+		boundOfr0[i].mag(intSup);
 
 		if(!intSup.subseteq(intZero))
 		{
@@ -5260,7 +5262,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	TaylorModelVec c = c0;
 	for(int i=1; i<=localMaxOrder; ++i)
 	{
-		c.Picard_non_polynomial_no_remainder_assign(c0, strOde, i, uncertainty_centers);	// compute c(t)
+		c.Picard_non_polynomial_taylor_no_remainder_assign(c0, strOde, i, uncertainty_centers);	// compute c(t)
 	}
 
 	TaylorModelVec dcdt;
@@ -5294,7 +5296,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	for(int i=0; i<rangeDim; ++i)
 	{
 		parseSetting.strODE = prefix + strOde[i] + suffix;
-		parseSetting.order = orders[i];
+		parseSetting.order = orders[i] - 1;
 
 		parseODE();		// call the parser
 
@@ -5333,7 +5335,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 	}
 
 	TaylorModelVec tmvTemp;
-	x.Picard_non_polynomial_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, orders, uncertainty_centers);
+	x.Picard_non_polynomial_taylor_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, orders, uncertainty_centers);
 
 	// compute the interval evaluation of the polynomial difference, this part is not able to be reduced by Picard iteration
 	vector<Interval> intDifferences;
@@ -5427,7 +5429,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 		}
 
 		// increase the approximation orders
-		x.Picard_non_polynomial_no_remainder_assign(x0, strOde, newOrders, uncertainty_centers);
+		x.Picard_non_polynomial_taylor_no_remainder_assign(x0, strOde, newOrders, bIncreased, uncertainty_centers);
 
 		for(int i=0; i<rangeDim; ++i)	// apply the estimation again
 		{
@@ -5435,7 +5437,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 		}
 
 		// compute the Picard operation again
-		x.Picard_non_polynomial_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, newOrders, uncertainty_centers);
+		x.Picard_non_polynomial_taylor_ctrunc_normal(tmvTemp, x0, strOde, step_exp_table, newOrders, uncertainty_centers);
 
 		for(int i=0; i<rangeDim; ++i)
 		{
@@ -5501,7 +5503,7 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 		bfinished = true;
 
 		vector<Interval> newRemainders;
-		x.Picard_non_polynomial_only_remainder(newRemainders, x0, strOde, step_exp_table[1]);
+		x.Picard_non_polynomial_taylor_only_remainder(newRemainders, x0, strOde, step_exp_table[1], newOrders);
 
 		for(int i=0; i<rangeDim; ++i)
 		{
@@ -5535,10 +5537,6 @@ bool Flowpipe::advance_non_polynomial(Flowpipe & result, const vector<string> & 
 
 	return true;
 }
-
-
-
-
 
 Flowpipe & Flowpipe::operator = (const Flowpipe & flowpipe)
 {
@@ -5657,7 +5655,7 @@ ContinuousSystem::~ContinuousSystem()
 
 // fixed step sizes and orders
 
-bool ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double step, const double time, const int order, const int precondition, vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
+void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double step, const double time, const int order, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
 {
 	vector<Interval> step_exp_table, step_end_exp_table;
 
@@ -5678,32 +5676,7 @@ bool ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 
 	for(double t=THRESHOLD_HIGH; t < time;)
 	{
-		//bool bvalid = currentFlowpipe.advance_low_degree(newFlowpipe, hfOde, taylorExpansion, precondition, step_exp_table, step_end_exp_table, order, estimation, uncertainties);
-		bool bvalid = true;
-		bool nextEst = true;
-		while (!currentFlowpipe.advance_low_degree(newFlowpipe, hfOde, taylorExpansion, precondition, step_exp_table, step_end_exp_table, order, estimation, uncertainties))
-		{
-			if (nextEst)
-			{
-				for (int i = 0; i < estimation.size(); ++i)
-					estimation[i] *= 2;
-				if (estimation[0].sup() > 1e20)
-				{
-					bvalid = false;
-					break;
-				}
-				//nextEst = false;
-				string str;
-				estimation[0].toString(str);		
-				cout << "Increasing error estimate to " << str << endl;
-			}
-			else
-			{
-				//mstep /= 2;
-				nextEst = true;
-				//cout << "Decreasing miniStep to " << mstep << endl;
-			}
-		}		
+		bool bvalid = currentFlowpipe.advance_low_degree(newFlowpipe, hfOde, taylorExpansion, precondition, step_exp_table, step_end_exp_table, order, estimation, uncertainties);
 
 		if(bvalid)
 		{
@@ -5721,10 +5694,10 @@ bool ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 		}
 		else
 		{
-			return false;
+			throw RemainderException();
+			break;
 		}
 	}
-	return true;
 }
 
 void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double step, const double time, const vector<int> & orders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
@@ -5772,7 +5745,7 @@ void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			throw RemainderException();
 			break;
 		}
 	}
@@ -5780,56 +5753,48 @@ void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 
 // adaptive step sizes and fixed orders
 
-bool ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double step, const double miniStep, const double time, const int order, const int precondition, vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
+void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double step, const double miniStep, const double time, const int order, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
 {
 	vector<Interval> step_exp_table, step_end_exp_table;
 
 	construct_step_exp_table(step_exp_table, step_end_exp_table, step, 2*order);
+
 	double newStep = 0;
 
 	results.clear();
 	results.push_back(initialSet);
 	Flowpipe newFlowpipe, currentFlowpipe = initialSet;
+
 	vector<Polynomial> polyODE;
 	for(int i=0; i<tmvOde.tms.size(); ++i)
 	{
 		polyODE.push_back(tmvOde.tms[i].expansion);
 	}
+	
 	vector<HornerForm> taylorExpansion;
 	computeTaylorExpansion(taylorExpansion, polyODE, order);
+	
 	double mstep = miniStep;
+	vector<Interval> est(estimation);
 	for(double t=THRESHOLD_HIGH; t < time;)
-	{	
-		if (bPrint)
-		{
-			printf("t    = %f,\t", t);
-			printf("time = %f,\t", time);
-			printf("newstep = %f,\n", newStep);	
-		}
-		if (t + step_exp_table[1].sup() > time)
-		{
-			newStep = time - t;
-			construct_step_exp_table(step_exp_table, step_end_exp_table, newStep, 2*order);
-			if (bPrint)
-				printf("Last step size modified to %f\n", newStep);	
-		}
-		
+	{
+		//bool bvalid = currentFlowpipe.advance_low_degree(newFlowpipe, hfOde, taylorExpansion, precondition, step_exp_table, step_end_exp_table, newStep, miniStep, order, estimation, uncertainties);
 		bool bvalid = true;
 		bool nextEst = true;
-		while (!currentFlowpipe.advance_low_degree(newFlowpipe, hfOde, taylorExpansion, precondition, step_exp_table, step_end_exp_table, newStep, mstep, order, estimation, uncertainties))
+		while (!currentFlowpipe.advance_low_degree(newFlowpipe, hfOde, taylorExpansion, precondition, step_exp_table, step_end_exp_table, newStep, mstep, order, est, uncertainties))
 		{
 			if (nextEst)
 			{
-				for (int i = 0; i < estimation.size(); ++i)
-					estimation[i] *= 2;
-				if (estimation[0].sup() > 1e20)
+				for (int i = 0; i < est.size(); ++i)
+					est[i] *= 2;
+				if (est[0].sup() > 1e20)
 				{
 					bvalid = false;
 					break;
 				}
 				nextEst = false;
 				string str;
-				estimation[0].toString(str);		
+				est[0].toString(str);		
 				cout << "Increasing error estimate to " << str << endl;
 			}
 			else
@@ -5838,9 +5803,8 @@ bool ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 				nextEst = true;
 				cout << "Decreasing miniStep to " << mstep << endl;
 			}
-		}		
-		//bool bvalid = currentFlowpipe.advance_low_degree(newFlowpipe, hfOde, taylorExpansion, precondition, step_exp_table, step_end_exp_table, newStep, miniStep, order, estimation, uncertainties);
-
+		}	
+		
 		if(bvalid)
 		{
 			results.push_back(newFlowpipe);
@@ -5855,23 +5819,26 @@ bool ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 				printf("order = %d\n", order);
 			}
 
-			double newStep = step_exp_table[1].sup() / LAMBDA;
-			if (bPrint)
-				printf("New step size: %f\n", newStep);
+			newStep = step_exp_table[1].sup() * LAMBDA_UP;
+
+			double tDiffer = time - t;
+
+			if(newStep > tDiffer)
+			{
+				newStep = tDiffer;
+			}
+
 			if(newStep > step - THRESHOLD_HIGH)
 			{
-				if (bPrint)
-					printf("New step size failed. Fall back to %f\n", step_exp_table[1].sup());
 				newStep = 0;
 			}
 		}
 		else
 		{
-			//fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
-			return false;
+			throw RemainderException();
+			break;
 		}
 	}
-	return true;
 }
 
 void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double step, const double miniStep, const double time, const vector<int> & orders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
@@ -5919,7 +5886,7 @@ void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 				printf("%s : %d\n", stateVarNames[num].c_str(), orders[num]);
 			}
 
-			double newStep = step_exp_table[1].sup() / LAMBDA;
+			newStep = step_exp_table[1].sup() * LAMBDA_UP;
 			if(newStep > step - THRESHOLD_HIGH)
 			{
 				newStep = 0;
@@ -5927,7 +5894,7 @@ void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			throw RemainderException();
 			break;
 		}
 	}
@@ -5935,7 +5902,7 @@ void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 
 // adaptive orders and fixed step sizes
 
-void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double step, const double time, const int order, const int maxOrder, const int precondition, vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
+void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double step, const double time, const int order, const int maxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
 {
 	vector<Interval> step_exp_table, step_end_exp_table;
 
@@ -5946,7 +5913,7 @@ void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 	Flowpipe newFlowpipe, currentFlowpipe = initialSet;
 
 	int newOrder = order;
-	int localMaxOrder = order;
+	int currentMaxOrder = order;
 
 	vector<Polynomial> polyODE;
 	for(int i=0; i<tmvOde.tms.size(); ++i)
@@ -5984,9 +5951,10 @@ void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 			if(newOrder > order)
 			{
 				--newOrder;
-				if(newOrder > localMaxOrder)
+
+				if(newOrder > currentMaxOrder)
 				{
-					for(int i=localMaxOrder; i<newOrder; ++i)
+					for(int i=currentMaxOrder; i<newOrder; ++i)
 					{
 						vector<HornerForm> newTaylorExpansionHF;
 						vector<Polynomial> newTaylorExpansionMF;
@@ -5997,13 +5965,13 @@ void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 						taylorExpansionMF = newTaylorExpansionMF;
 					}
 
-					localMaxOrder = newOrder;
+					currentMaxOrder = newOrder;
 				}
 			}
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			throw RemainderException();
 			break;
 		}
 	}
@@ -6094,11 +6062,21 @@ void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			throw RemainderException();
 			break;
 		}
 	}
 }
+
+
+
+
+
+
+
+
+
+
 
 // for high-degree ODEs
 // fixed step sizes and orders
@@ -6133,7 +6111,7 @@ void ContinuousSystem::reach_high_degree(list<Flowpipe> & results, const double 
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			throw RemainderException();
 			break;
 		}
 	}
@@ -6175,7 +6153,7 @@ void ContinuousSystem::reach_high_degree(list<Flowpipe> & results, const double 
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			throw RemainderException();
 			break;
 		}
 	}
@@ -6213,7 +6191,7 @@ void ContinuousSystem::reach_high_degree(list<Flowpipe> & results, const double 
 				printf("order = %d\n", order);
 			}
 
-			double newStep = step_exp_table[1].sup() / LAMBDA;
+			newStep = step_exp_table[1].sup() * LAMBDA_UP;
 			if(newStep > step - THRESHOLD_HIGH)
 			{
 				newStep = 0;
@@ -6221,7 +6199,7 @@ void ContinuousSystem::reach_high_degree(list<Flowpipe> & results, const double 
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			throw RemainderException();
 			break;
 		}
 	}
@@ -6263,7 +6241,7 @@ void ContinuousSystem::reach_high_degree(list<Flowpipe> & results, const double 
 				printf("%s : %d\n", stateVarNames[num].c_str(), orders[num]);
 			}
 
-			double newStep = step_exp_table[1].sup() / LAMBDA;
+			newStep = step_exp_table[1].sup() * LAMBDA_UP;
 			if(newStep > step - THRESHOLD_HIGH)
 			{
 				newStep = 0;
@@ -6271,7 +6249,7 @@ void ContinuousSystem::reach_high_degree(list<Flowpipe> & results, const double 
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			throw RemainderException();
 			break;
 		}
 	}
@@ -6316,7 +6294,7 @@ void ContinuousSystem::reach_high_degree(list<Flowpipe> & results, const double 
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			throw RemainderException();
 			break;
 		}
 	}
@@ -6373,7 +6351,7 @@ void ContinuousSystem::reach_high_degree(list<Flowpipe> & results, const double 
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			throw RemainderException();
 			break;
 		}
 	}
@@ -6382,10 +6360,19 @@ void ContinuousSystem::reach_high_degree(list<Flowpipe> & results, const double 
 
 
 
-// for non-polynomial ODEs
+
+
+
+
+
+
+
+
+
+// for non-polynomial ODEs (using Taylor approximations)
 // fixed step sizes and orders
 
-bool ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const double step, const double time, const int order, const int precondition, vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
+void ContinuousSystem::reach_non_polynomial_taylor(list<Flowpipe> & results, const double step, const double time, const int order, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
 {
 	vector<Interval> step_exp_table, step_end_exp_table;
 
@@ -6395,25 +6382,26 @@ bool ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const doub
 	results.push_back(initialSet);
 	Flowpipe newFlowpipe, currentFlowpipe = initialSet;
 
+	vector<Interval> est(estimation);
 	for(double t=THRESHOLD_HIGH; t < time;)
-	{	
-		//bool bvalid = currentFlowpipe.advance_non_polynomial(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, order, estimation, uncertainties, uncertainty_centers);
+	{
+		//bool bvalid = currentFlowpipe.advance_non_polynomial_taylor(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, order, estimation, uncertainties, uncertainty_centers);
 		bool bvalid = true;
 		bool nextEst = true;
-		while (!currentFlowpipe.advance_non_polynomial(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, order, estimation, uncertainties, uncertainty_centers))
+		while (!currentFlowpipe.advance_non_polynomial_taylor(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, order, est, uncertainties, uncertainty_centers))
 		{
 			if (nextEst)
 			{
-				for (int i = 0; i < estimation.size(); ++i)
-					estimation[i] *= 2;
-				if (estimation[0].sup() > 1e5)
+				for (int i = 0; i < est.size(); ++i)
+					est[i] *= 2;
+				if (est[0].sup() > 1e5)
 				{
 					bvalid = false;
 					break;
 				}
 				//nextEst = false;
 				string str;
-				estimation[0].toString(str);		
+				est[0].toString(str);		
 				cout << "Increasing error estimate to " << str << endl;
 			}
 			else
@@ -6440,13 +6428,13 @@ bool ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const doub
 		}
 		else
 		{
-			return false;
+			throw RemainderException();
+			break;
 		}
 	}
-	return true;
 }
 
-void ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const double step, const double time, const vector<int> & orders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
+void ContinuousSystem::reach_non_polynomial_taylor(list<Flowpipe> & results, const double step, const double time, const vector<int> & orders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
 {
 	vector<Interval> step_exp_table, step_end_exp_table;
 
@@ -6458,7 +6446,7 @@ void ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const doub
 
 	for(double t=THRESHOLD_HIGH; t < time;)
 	{
-		bool bvalid = currentFlowpipe.advance_non_polynomial(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, orders, globalMaxOrder, estimation, uncertainties, uncertainty_centers);
+		bool bvalid = currentFlowpipe.advance_non_polynomial_taylor(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, orders, globalMaxOrder, estimation, uncertainties, uncertainty_centers);
 
 		if(bvalid)
 		{
@@ -6482,14 +6470,14 @@ void ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const doub
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			throw RemainderException();
 			break;
 		}
 	}
 }
 
 // adaptive step sizes and fixed orders
-bool ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const double step, const double miniStep, const double time, const int order, const int precondition, vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
+void ContinuousSystem::reach_non_polynomial_taylor(list<Flowpipe> & results, const double step, const double miniStep, const double time, const int order, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
 {
 	vector<Interval> step_exp_table, step_end_exp_table;
 
@@ -6502,38 +6490,26 @@ bool ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const doub
 	Flowpipe newFlowpipe, currentFlowpipe = initialSet;
 
 	double mstep = miniStep;
+	vector<Interval> est(estimation);
 	for(double t=THRESHOLD_HIGH; t < time;)
 	{
-		if (bPrint)
-		{
-			printf("t    = %f,\t", t);
-			printf("time = %f,\t", time);
-			printf("newstep = %f,\n", newStep);	
-		}
-		if (t + step_exp_table[1].sup() > time)
-		{
-			newStep = time - t;
-			construct_step_exp_table(step_exp_table, step_end_exp_table, newStep, 2*order);
-			if (bPrint)
-				printf("Last step size modified to %f\n", newStep);	
-		}
-		//bool bvalid = currentFlowpipe.advance_non_polynomial(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, newStep, miniStep, order, estimation, uncertainties, uncertainty_centers);
+		//bool bvalid = currentFlowpipe.advance_non_polynomial_taylor(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, newStep, miniStep, order, estimation, uncertainties, uncertainty_centers);
 		bool bvalid = true;
 		bool nextEst = true;
-		while (!currentFlowpipe.advance_non_polynomial(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, newStep, mstep, order, estimation, uncertainties, uncertainty_centers))
+		while (!currentFlowpipe.advance_non_polynomial_taylor(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, newStep, mstep, order, est, uncertainties, uncertainty_centers))
 		{
 			if (nextEst)
 			{
-				for (int i = 0; i < estimation.size(); ++i)
-					estimation[i] *= 2;
-				if (estimation[0].sup() > 1e5)
+				for (int i = 0; i < est.size(); ++i)
+					est[i] *= 2;
+				if (est[0].sup() > 1e5)
 				{
 					bvalid = false;
 					break;
 				}
 				nextEst = false;
 				string str;
-				estimation[0].toString(str);		
+				est[0].toString(str);		
 				cout << "Increasing error estimate to " << str << endl;
 			}
 			else
@@ -6558,25 +6534,21 @@ bool ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const doub
 				printf("order = %d\n", order);
 			}
 
-			double newStep = step_exp_table[1].sup() / LAMBDA;
-			if (bPrint)
-				printf("New step size: %f\n", newStep);
+			newStep = step_exp_table[1].sup() * LAMBDA_UP;
 			if(newStep > step - THRESHOLD_HIGH)
 			{
-				if (bPrint)
-					printf("New step size failed. Fall back to %f\n", step_exp_table[1].sup());
 				newStep = 0;
 			}
 		}
 		else
 		{
-			return false;
+			throw RemainderException();
+			break;
 		}
 	}
-	return true;
 }
 
-void ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const double step, const double miniStep, const double time, const vector<int> & orders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
+void ContinuousSystem::reach_non_polynomial_taylor(list<Flowpipe> & results, const double step, const double miniStep, const double time, const vector<int> & orders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
 {
 	vector<Interval> step_exp_table, step_end_exp_table;
 
@@ -6590,7 +6562,7 @@ void ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const doub
 
 	for(double t=THRESHOLD_HIGH; t < time;)
 	{
-		bool bvalid = currentFlowpipe.advance_non_polynomial(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, newStep, miniStep, orders, globalMaxOrder, estimation, uncertainties, uncertainty_centers);
+		bool bvalid = currentFlowpipe.advance_non_polynomial_taylor(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, newStep, miniStep, orders, globalMaxOrder, estimation, uncertainties, uncertainty_centers);
 
 		if(bvalid)
 		{
@@ -6612,7 +6584,7 @@ void ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const doub
 				printf("%s : %d\n", stateVarNames[num].c_str(), orders[num]);
 			}
 
-			double newStep = step_exp_table[1].sup() / LAMBDA;
+			newStep = step_exp_table[1].sup() * LAMBDA_UP;
 			if(newStep > step - THRESHOLD_HIGH)
 			{
 				newStep = 0;
@@ -6620,7 +6592,7 @@ void ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const doub
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			throw RemainderException();
 			break;
 		}
 	}
@@ -6628,7 +6600,7 @@ void ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const doub
 
 
 // adaptive orders and fixed step sizes
-void ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const double step, const double time, const int order, const int maxOrder, const int precondition, vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
+void ContinuousSystem::reach_non_polynomial_taylor(list<Flowpipe> & results, const double step, const double time, const int order, const int maxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
 {
 	vector<Interval> step_exp_table, step_end_exp_table;
 
@@ -6642,7 +6614,7 @@ void ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const doub
 
 	for(double t=THRESHOLD_HIGH; t < time;)
 	{
-		bool bvalid = currentFlowpipe.advance_non_polynomial(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, newOrder, maxOrder, estimation, uncertainties, uncertainty_centers);
+		bool bvalid = currentFlowpipe.advance_non_polynomial_taylor(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, newOrder, maxOrder, estimation, uncertainties, uncertainty_centers);
 
 		if(bvalid)
 		{
@@ -6665,13 +6637,13 @@ void ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const doub
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			throw RemainderException();
 			break;
 		}
 	}
 }
 
-void ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const double step, const double time, const vector<int> & orders, const vector<int> & maxOrders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
+void ContinuousSystem::reach_non_polynomial_taylor(list<Flowpipe> & results, const double step, const double time, const vector<int> & orders, const vector<int> & maxOrders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const
 {
 	vector<Interval> step_exp_table, step_end_exp_table;
 
@@ -6692,7 +6664,7 @@ void ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const doub
 				localMaxOrder = newOrders[i];
 		}
 
-		bool bvalid = currentFlowpipe.advance_non_polynomial(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, newOrders, localMaxOrder, maxOrders, estimation, uncertainties, uncertainty_centers);
+		bool bvalid = currentFlowpipe.advance_non_polynomial_taylor(newFlowpipe, strOde, precondition, step_exp_table, step_end_exp_table, newOrders, localMaxOrder, maxOrders, estimation, uncertainties, uncertainty_centers);
 
 		if(bvalid)
 		{
@@ -6722,12 +6694,11 @@ void ContinuousSystem::reach_non_polynomial(list<Flowpipe> & results, const doub
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			throw RemainderException();
 			break;
 		}
 	}
 }
-
 
 ContinuousSystem & ContinuousSystem::operator = (const ContinuousSystem & system)
 {
@@ -6809,16 +6780,35 @@ void ContinuousReachability::dump(FILE *fp) const
 	}
 	fprintf(fp, "%s\n\n", stateVarNames[stateVarNames.size()-1].c_str());
 
-	switch(plotSetting)
+	switch(plotFormat)
 	{
-	case PLOT_INTERVAL:
-		fprintf(fp, "visualize interval %s , %s\n\n", stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+	case PLOT_GNUPLOT:
+		switch(plotSetting)
+		{
+		case PLOT_INTERVAL:
+			fprintf(fp, "gnuplot interval %s , %s\n\n", stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+			break;
+		case PLOT_OCTAGON:
+			fprintf(fp, "gnuplot octagon %s , %s\n\n", stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+			break;
+		case PLOT_GRID:
+			fprintf(fp, "gnuplot grid %d %s , %s\n\n", numSections, stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+			break;
+		}
 		break;
-	case PLOT_OCTAGON:
-		fprintf(fp, "visualize octagon %s , %s\n\n", stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
-		break;
-	case PLOT_GRID:
-		fprintf(fp, "visualize grid %d %s , %s\n\n", numSections, stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+	case PLOT_MATLAB:
+		switch(plotSetting)
+		{
+		case PLOT_INTERVAL:
+			fprintf(fp, "matlab interval %s , %s\n\n", stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+			break;
+		case PLOT_OCTAGON:
+			fprintf(fp, "matlab octagon %s , %s\n\n", stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+			break;
+		case PLOT_GRID:
+			fprintf(fp, "matlab grid %d %s , %s\n\n", numSections, stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+			break;
+		}
 		break;
 	}
 
@@ -6872,6 +6862,10 @@ void ContinuousReachability::dump(FILE *fp) const
 
 void ContinuousReachability::run()
 {
+	compute_factorial_rec(globalMaxOrder+1);
+	compute_power_4(globalMaxOrder+1);
+	compute_double_factorial(2*globalMaxOrder);
+
 	switch(integrationScheme)
 	{
 	case LOW_DEGREE:
@@ -6946,36 +6940,36 @@ void ContinuousReachability::run()
 		break;
 	}
 
-	case NON_POLY:
+	case NONPOLY_TAYLOR:
 	{
 		switch(orderType)
 		{
 		case UNIFORM:
 			if(bAdaptiveSteps)
 			{
-				system.reach_non_polynomial(flowpipes, step, miniStep, time, orders[0], precondition, estimation, bPrint, stateVarNames);
+				system.reach_non_polynomial_taylor(flowpipes, step, miniStep, time, orders[0], precondition, estimation, bPrint, stateVarNames);
 			}
 			else if(bAdaptiveOrders)
 			{
-				system.reach_non_polynomial(flowpipes, step, time, orders[0], maxOrders[0], precondition, estimation, bPrint, stateVarNames);
+				system.reach_non_polynomial_taylor(flowpipes, step, time, orders[0], maxOrders[0], precondition, estimation, bPrint, stateVarNames);
 			}
 			else
 			{
-				system.reach_non_polynomial(flowpipes, step, time, orders[0], precondition, estimation, bPrint, stateVarNames);
+				system.reach_non_polynomial_taylor(flowpipes, step, time, orders[0], precondition, estimation, bPrint, stateVarNames);
 			}
 			break;
 		case MULTI:
 			if(bAdaptiveSteps)
 			{
-				system.reach_non_polynomial(flowpipes, step, miniStep, time, orders, globalMaxOrder, precondition, estimation, bPrint, stateVarNames);
+				system.reach_non_polynomial_taylor(flowpipes, step, miniStep, time, orders, globalMaxOrder, precondition, estimation, bPrint, stateVarNames);
 			}
 			else if(bAdaptiveOrders)
 			{
-				system.reach_non_polynomial(flowpipes, step, time, orders, maxOrders, globalMaxOrder, precondition, estimation, bPrint, stateVarNames);
+				system.reach_non_polynomial_taylor(flowpipes, step, time, orders, maxOrders, globalMaxOrder, precondition, estimation, bPrint, stateVarNames);
 			}
 			else
 			{
-				system.reach_non_polynomial(flowpipes, step, time, orders, globalMaxOrder, precondition, estimation, bPrint, stateVarNames);
+				system.reach_non_polynomial_taylor(flowpipes, step, time, orders, globalMaxOrder, precondition, estimation, bPrint, stateVarNames);
 			}
 			break;
 		}
@@ -7018,6 +7012,24 @@ int ContinuousReachability::safetyChecking() const
 		return UNSAFE;	// since the whole state space is unsafe, the system is not safe
 	}
 
+	bool bDumpCounterexamples = true;
+
+	int mkres = mkdir(counterexampleDir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+	if(mkres < 0 && errno != EEXIST)
+	{
+		printf("Can not create the directory for counterexamples.\n");
+		bDumpCounterexamples = false;
+	}
+
+	char filename_counterexamples[NAME_SIZE+10];
+	FILE *fpDumpCounterexamples;
+
+	if(bDumpCounterexamples)
+	{
+		sprintf(filename_counterexamples, "%s%s%s", counterexampleDir, outputFileName, str_counterexample_dumping_name_suffix);
+		fpDumpCounterexamples = fopen(filename_counterexamples, "w");
+	}
+
 	list<TaylorModelVec>::const_iterator tmvIter = flowpipesCompo.begin();
 	list<vector<Interval> >::const_iterator doIter = domains.begin();
 
@@ -7026,7 +7038,14 @@ int ContinuousReachability::safetyChecking() const
 	int rangeDim = tmvIter->tms.size();
 	int domainDim = doIter->size();
 
+	int result = SAFE;
+
+	list<TaylorModelVec> unsafe_flowpipes;
+	list<vector<Interval> > unsafe_flowpipe_domains;
+	list<Interval> globalTimes;
+
 	int maxOrder = 0;
+	Interval globalTime;
 
 	for(; tmvIter!=flowpipesCompo.end(); ++tmvIter, ++doIter)
 	{
@@ -7055,7 +7074,7 @@ int ContinuousReachability::safetyChecking() const
 			TaylorModel tmTemp;
 
 			// interval evaluation on the constraint
-			unsafeSet[i].hf.insert_ctrunc_normal(tmTemp, *tmvIter, tmvPolyRange, step_exp_table, domainDim, maxOrder);
+			unsafeSet[i].hf.insert_normal(tmTemp, *tmvIter, tmvPolyRange, step_exp_table, domainDim);
 
 			Interval intTemp;
 			tmTemp.intEvalNormal(intTemp, step_exp_table);
@@ -7074,11 +7093,27 @@ int ContinuousReachability::safetyChecking() const
 
 		if(!bsafe)
 		{
-			return UNKNOWN;
+			unsafe_flowpipes.push_back(*tmvIter);
+			unsafe_flowpipe_domains.push_back(*doIter);
+			globalTimes.push_back(globalTime);
+
+			result = UNKNOWN;
 		}
+
+		globalTime += (*doIter)[0];
 	}
 
-	return SAFE;
+	if(bDumpCounterexamples && unsafe_flowpipes.size() > 0)
+	{
+		dump_potential_counterexample(fpDumpCounterexamples, unsafe_flowpipes, unsafe_flowpipe_domains, globalTimes);
+	}
+
+	if(bDumpCounterexamples)
+	{
+		fclose(fpDumpCounterexamples);
+	}
+
+	return result;
 }
 
 unsigned long ContinuousReachability::numOfFlowpipes() const
@@ -7086,23 +7121,83 @@ unsigned long ContinuousReachability::numOfFlowpipes() const
 	return (unsigned long)(flowpipes.size()) - 1;
 }
 
-void ContinuousReachability::output_2D_GNUPLOT(FILE *fp) const
+void ContinuousReachability::dump_potential_counterexample(FILE *fp, const list<TaylorModelVec> & flowpipes, const list<vector<Interval> > & domains, const list<Interval> & globalTimes) const
+{
+	list<TaylorModelVec>::const_iterator fpIter = flowpipes.begin();
+	list<vector<Interval> >::const_iterator doIter = domains.begin();
+	list<Interval>::const_iterator timeIter = globalTimes.begin();
+
+	for(; fpIter!=flowpipes.end(); ++fpIter, ++doIter, ++timeIter)
+	{
+		fprintf(fp, "starting time %lf\n{\n", timeIter->sup());
+
+		fpIter->dump_interval(fp, stateVarNames, tmVarNames);
+
+		for(int i=0; i<doIter->size(); ++i)
+		{
+			fprintf(fp, "%s in ", tmVarNames[i].c_str());
+			(*doIter)[i].dump(fp);
+			fprintf(fp, "\n");
+		}
+
+		fprintf(fp, "}\n\n\n");
+	}
+}
+
+void ContinuousReachability::plot_2D() const
+{
+	char filename[NAME_SIZE+10];
+
+	switch(plotFormat)
+	{
+	case PLOT_GNUPLOT:
+		sprintf(filename, "%s%s.plt", outputDir, outputFileName);
+		break;
+	case PLOT_MATLAB:
+		sprintf(filename, "%s%s.m", outputDir, outputFileName);
+		break;
+	}
+
+	FILE *fpPlotting = fopen(filename, "w");
+
+	if(fpPlotting == NULL)
+	{
+		printf("Can not create the plotting file.\n");
+		exit(1);
+	}
+
+	printf("Generating the plotting file...\n");
+	switch(plotFormat)
+	{
+	case PLOT_GNUPLOT:
+		plot_2D_GNUPLOT(fpPlotting);
+		break;
+	case PLOT_MATLAB:
+		plot_2D_MATLAB(fpPlotting);
+		break;
+	}
+	printf("Done.\n");
+
+	fclose(fpPlotting);
+}
+
+void ContinuousReachability::plot_2D_GNUPLOT(FILE *fp) const
 {
 	switch(plotSetting)
 	{
 	case PLOT_INTERVAL:
-		output_2D_interval_GNUPLOT(fp);
+		plot_2D_interval_GNUPLOT(fp);
 		break;
 	case PLOT_OCTAGON:
-		output_2D_octagon_GNUPLOT(fp);
+		plot_2D_octagon_GNUPLOT(fp);
 		break;
 	case PLOT_GRID:
-		output_2D_grid_GNUPLOT(fp);
+		plot_2D_grid_GNUPLOT(fp);
 		break;
 	}
 }
 
-void ContinuousReachability::output_2D_interval_GNUPLOT(FILE *fp) const
+void ContinuousReachability::plot_2D_interval_GNUPLOT(FILE *fp) const
 {
 	fprintf(fp, "set terminal postscript\n");
 
@@ -7150,7 +7245,7 @@ void ContinuousReachability::output_2D_interval_GNUPLOT(FILE *fp) const
 
 		Interval X(box[outputAxes[0]]), Y(box[outputAxes[1]]);
 
-		// output all the vertices
+		// output the vertices
 		fprintf(fp, "%lf %lf\n", X.inf(), Y.inf());
 		fprintf(fp, "%lf %lf\n", X.sup(), Y.inf());
 		fprintf(fp, "%lf %lf\n", X.sup(), Y.sup());
@@ -7158,9 +7253,11 @@ void ContinuousReachability::output_2D_interval_GNUPLOT(FILE *fp) const
 		fprintf(fp, "%lf %lf\n", X.inf(), Y.inf());
 		fprintf(fp, "\n\n");
 	}
+
+	fprintf(fp, "e\n");
 }
 
-void ContinuousReachability::output_2D_octagon_GNUPLOT(FILE *fp) const
+void ContinuousReachability::plot_2D_octagon_GNUPLOT(FILE *fp) const
 {
 	int x = outputAxes[0];
 	int y = outputAxes[1];
@@ -7351,7 +7448,7 @@ void ContinuousReachability::output_2D_octagon_GNUPLOT(FILE *fp) const
 	gsl_vector_free(vertex);
 }
 
-void ContinuousReachability::output_2D_grid_GNUPLOT(FILE *fp) const
+void ContinuousReachability::plot_2D_grid_GNUPLOT(FILE *fp) const
 {
 	fprintf(fp, "set terminal postscript\n");
 
@@ -7376,29 +7473,8 @@ void ContinuousReachability::output_2D_grid_GNUPLOT(FILE *fp) const
 	{
 		// decompose the domain
 		list<vector<Interval> > grids;
-		grids.push_back(*doIter);
 
-		for(int i=0; i<domainDim; ++i)
-		{
-			list<vector<Interval> > newGrids;
-
-			for(; grids.size() != 0;)
-			{
-				vector<Interval> grid = grids.front();
-				grids.pop_front();
-				double width = grid[i].width();
-
-				for(int j=1; j<=numSections; ++j)
-				{
-					Interval I( grid[i].inf()+width*(double)(j-1)/(double)numSections , grid[i].inf()+width*(double)j/(double)numSections);
-					vector<Interval> newGrid = grid;
-					newGrid[i] = I;
-					newGrids.push_back(newGrid);
-				}
-			}
-
-			grids = newGrids;
-		}
+		gridBox(grids, *doIter, numSections);
 
 		// we only consider the output dimensions
 		HornerForm hfOutputX;
@@ -7432,6 +7508,297 @@ void ContinuousReachability::output_2D_grid_GNUPLOT(FILE *fp) const
 	}
 
 	fprintf(fp, "e\n");
+}
+
+void ContinuousReachability::plot_2D_MATLAB(FILE *fp) const
+{
+	switch(plotSetting)
+	{
+	case PLOT_INTERVAL:
+		plot_2D_interval_MATLAB(fp);
+		break;
+	case PLOT_OCTAGON:
+		plot_2D_octagon_MATLAB(fp);
+		break;
+	case PLOT_GRID:
+		plot_2D_grid_MATLAB(fp);
+		break;
+	}
+}
+
+void ContinuousReachability::plot_2D_interval_MATLAB(FILE *fp) const
+{
+	vector<Interval> step_exp_table, step_end_exp_table;
+	Interval intStep;
+
+	list<TaylorModelVec>::const_iterator tmvIter = flowpipesCompo.begin();
+	list<vector<Interval> >::const_iterator doIter = domains.begin();
+
+	int maxOrder = 0;
+
+	for(; tmvIter != flowpipesCompo.end() && doIter != domains.end(); ++tmvIter, ++doIter)
+	{
+		int tmp = maxOrder;
+		for(int i=0; i<tmvIter->tms.size(); ++i)
+		{
+			int order = tmvIter->tms[i].expansion.degree();
+			if(maxOrder < order)
+			{
+				maxOrder = order;
+			}
+		}
+
+		if(step_exp_table.size() == 0 || intStep != (*doIter)[0] || maxOrder > tmp)
+		{
+			construct_step_exp_table(step_exp_table, step_end_exp_table, (*doIter)[0].sup(), maxOrder);
+			intStep = (*doIter)[0];
+		}
+
+		vector<Interval> box;
+		tmvIter->intEvalNormal(box, step_exp_table);
+
+		Interval X(box[outputAxes[0]]), Y(box[outputAxes[1]]);
+
+		// output all the vertices
+		fprintf(fp,"plot( [%lf,%lf,%lf,%lf,%lf] , [%lf,%lf,%lf,%lf,%lf] , 'b');\nhold on;\nclear;\n",
+				X.inf(), X.sup(), X.sup(), X.inf(), X.inf(), Y.inf(), Y.inf(), Y.sup(), Y.sup(), Y.inf());
+	}
+}
+
+void ContinuousReachability::plot_2D_octagon_MATLAB(FILE *fp) const
+{
+	int x = outputAxes[0];
+	int y = outputAxes[1];
+
+	int rangeDim = stateVarNames.size();
+	Matrix output_poly_temp(8, rangeDim);
+
+	output_poly_temp.set(1, 0, x);
+	output_poly_temp.set(1, 1, y);
+	output_poly_temp.set(-1, 2, x);
+	output_poly_temp.set(-1, 3, y);
+	output_poly_temp.set(1/sqrt(2), 4, x);
+	output_poly_temp.set(1/sqrt(2), 4, y);
+	output_poly_temp.set(1/sqrt(2), 5, x);
+	output_poly_temp.set(-1/sqrt(2), 5, y);
+	output_poly_temp.set(-1/sqrt(2), 6, x);
+	output_poly_temp.set(1/sqrt(2), 6, y);
+	output_poly_temp.set(-1/sqrt(2), 7, x);
+	output_poly_temp.set(-1/sqrt(2), 7, y);
+
+	// Construct the 2D template matrix.
+	int rows = 8;
+	int cols = rangeDim;
+
+	Matrix sortedTemplate(rows, cols);
+	RowVector rowVec(cols);
+	list<RowVector> sortedRows;
+	list<RowVector>::iterator iterp, iterq;
+
+	output_poly_temp.row(rowVec, 0);
+	sortedRows.push_back(rowVec);
+
+	bool bInserted;
+
+	// Sort the row vectors in the template by anti-clockwise order (only in the x-y space).
+	for(int i=1; i<rows; ++i)
+	{
+		iterp = sortedRows.begin();
+		iterq = iterp;
+		++iterq;
+		bInserted = false;
+
+		for(; iterq != sortedRows.end();)
+		{
+			double tmp1 = output_poly_temp.get(i,x) * iterp->get(y) - output_poly_temp.get(i,y) * iterp->get(x);
+			double tmp2 = output_poly_temp.get(i,x) * iterq->get(y) - output_poly_temp.get(i,y) * iterq->get(x);
+
+			if(tmp1 < 0 && tmp2 > 0)
+			{
+				output_poly_temp.row(rowVec, i);
+				sortedRows.insert(iterq, rowVec);
+				bInserted = true;
+				break;
+			}
+			else
+			{
+				++iterp;
+				++iterq;
+			}
+		}
+
+		if(!bInserted)
+		{
+			output_poly_temp.row(rowVec, i);
+			sortedRows.push_back(rowVec);
+		}
+	}
+
+	iterp = sortedRows.begin();
+	for(int i=0; i<rows; ++i, ++iterp)
+	{
+		for(int j=0; j<cols; ++j)
+		{
+			sortedTemplate.set(iterp->get(j), i, j);
+		}
+	}
+
+	ColVector b(rows);
+	Polyhedron polyTemplate(sortedTemplate, b);
+
+	// Compute the intersections of two facets.
+	// The vertices are ordered clockwisely.
+
+	gsl_matrix *C = gsl_matrix_alloc(2,2);
+	gsl_vector *d = gsl_vector_alloc(2);
+	gsl_vector *vertex = gsl_vector_alloc(2);
+
+	vector<Interval> step_exp_table, step_end_exp_table;
+	Interval intStep;
+
+	list<TaylorModelVec>::const_iterator tmvIter = flowpipesCompo.begin();
+	list<vector<Interval> >::const_iterator doIter = domains.begin();
+
+	int maxOrder = 0;
+
+	for(; tmvIter != flowpipesCompo.end() && doIter != domains.end(); ++tmvIter, ++doIter)
+	{
+		int tmp = maxOrder;
+		for(int i=0; i<tmvIter->tms.size(); ++i)
+		{
+			int order = tmvIter->tms[i].expansion.degree();
+			if(maxOrder < order)
+			{
+				maxOrder = order;
+			}
+		}
+
+		if(step_exp_table.size() == 0 || intStep != (*doIter)[0] || maxOrder > tmp)
+		{
+			construct_step_exp_table(step_exp_table, step_end_exp_table, (*doIter)[0].sup(), maxOrder);
+			intStep = (*doIter)[0];
+		}
+
+
+		templatePolyhedronNormal(polyTemplate, *tmvIter, step_exp_table);
+
+		double f1, f2;
+
+		list<LinearConstraint>::iterator iterp, iterq;
+		iterp = iterq = polyTemplate.constraints.begin();
+		++iterq;
+
+		vector<double> vertices_x, vertices_y;
+
+		for(; iterq != polyTemplate.constraints.end(); ++iterp, ++iterq)
+		{
+			gsl_matrix_set(C, 0, 0, iterp->A[x].midpoint());
+			gsl_matrix_set(C, 0, 1, iterp->A[y].midpoint());
+			gsl_matrix_set(C, 1, 0, iterq->A[x].midpoint());
+			gsl_matrix_set(C, 1, 1, iterq->A[y].midpoint());
+
+			gsl_vector_set(d, 0, iterp->B.midpoint());
+			gsl_vector_set(d, 1, iterq->B.midpoint());
+
+			gsl_linalg_HH_solve(C, d, vertex);
+
+			double v1 = gsl_vector_get(vertex, 0);
+			double v2 = gsl_vector_get(vertex, 1);
+
+			if(iterp == polyTemplate.constraints.begin())
+			{
+				f1 = v1;
+				f2 = v2;
+			}
+
+			vertices_x.push_back(v1);
+			vertices_y.push_back(v2);
+		}
+
+		iterp = polyTemplate.constraints.begin();
+		--iterq;
+
+		gsl_matrix_set(C, 0, 0, iterp->A[x].midpoint());
+		gsl_matrix_set(C, 0, 1, iterp->A[y].midpoint());
+		gsl_matrix_set(C, 1, 0, iterq->A[x].midpoint());
+		gsl_matrix_set(C, 1, 1, iterq->A[y].midpoint());
+
+		gsl_vector_set(d, 0, iterp->B.midpoint());
+		gsl_vector_set(d, 1, iterq->B.midpoint());
+
+		gsl_linalg_HH_solve(C, d, vertex);
+
+		double v1 = gsl_vector_get(vertex, 0);
+		double v2 = gsl_vector_get(vertex, 1);
+
+		vertices_x.push_back(v1);
+		vertices_y.push_back(v2);
+		vertices_x.push_back(f1);
+		vertices_y.push_back(f2);
+
+		fprintf(fp, "plot( ");
+
+		fprintf(fp, "[ ");
+		for(int i=0; i<vertices_x.size()-1; ++i)
+		{
+			fprintf(fp, "%lf , ", vertices_x[i]);
+		}
+		fprintf(fp, "%lf ] , ", vertices_x.back());
+
+		fprintf(fp, "[ ");
+		for(int i=0; i<vertices_y.size()-1; ++i)
+		{
+			fprintf(fp, "%lf , ", vertices_y[i]);
+		}
+		fprintf(fp, "%lf ] , ", vertices_y.back());
+
+		fprintf(fp, "'b');\nhold on;\nclear;\n");
+	}
+
+	gsl_matrix_free(C);
+	gsl_vector_free(d);
+	gsl_vector_free(vertex);
+}
+
+void ContinuousReachability::plot_2D_grid_MATLAB(FILE *fp) const
+{
+	list<TaylorModelVec>::const_iterator tmvIter = flowpipesCompo.begin();
+	list<vector<Interval> >::const_iterator doIter = domains.begin();
+	int domainDim = doIter->size();
+
+	for(; tmvIter != flowpipesCompo.end() && doIter != domains.end(); ++tmvIter, ++doIter)
+	{
+		// decompose the domain
+		list<vector<Interval> > grids;
+
+		gridBox(grids, *doIter, numSections);
+
+		// we only consider the output dimensions
+		HornerForm hfOutputX;
+		Interval remainderX;
+		tmvIter->tms[outputAxes[0]].toHornerForm(hfOutputX, remainderX);
+
+		HornerForm hfOutputY;
+		Interval remainderY;
+		tmvIter->tms[outputAxes[1]].toHornerForm(hfOutputY, remainderY);
+
+		// evaluate the images from all of the grids
+		list<vector<Interval> >::const_iterator gIter = grids.begin();
+		for(; gIter!=grids.end(); ++gIter)
+		{
+			Interval X;
+			hfOutputX.intEval(X, *gIter);
+			X += remainderX;
+
+			Interval Y;
+			hfOutputY.intEval(Y, *gIter);
+			Y += remainderY;
+
+			// output the vertices
+			fprintf(fp,"plot( [%lf,%lf,%lf,%lf,%lf] , [%lf,%lf,%lf,%lf,%lf] , 'b');\nhold on;\nclear;\n",
+					X.inf(), X.sup(), X.sup(), X.inf(), X.inf(), Y.inf(), Y.inf(), Y.sup(), Y.sup(), Y.inf());
+		}
+	}
 }
 
 bool ContinuousReachability::declareStateVar(const string & vName)
@@ -7525,22 +7892,21 @@ void computeTaylorExpansion(TaylorModelVec & result, const TaylorModelVec & firs
 	// we compute the Taylor expansion (without the 0-order term)
 	TaylorModelVec taylorExpansion;
 	first_order_deriv.evaluate_t(taylorExpansion, intVecZero);
+//	taylorExpansion.nctrunc(order - 1);
 	taylorExpansion.mul_assign(0, 1);
 
 	TaylorModelVec tmvLieDeriv_n = first_order_deriv;
 
-	Interval intFactor(1);
 	for(int i=2; i<=order; ++i)
 	{
-		intFactor.div_assign((double)i);
 		TaylorModelVec tmvTemp;
-		tmvLieDeriv_n.LieDerivative_no_remainder(tmvTemp, ode, order);
+		tmvLieDeriv_n.LieDerivative_no_remainder(tmvTemp, ode, order - i);
 
 		TaylorModelVec tmvTemp2;
 		tmvTemp.evaluate_t(tmvTemp2, intVecZero);
-		tmvTemp2.mul_assign(intFactor);
+		tmvTemp2.mul_assign(factorial_rec[i]);
 		tmvTemp2.mul_assign(0,i);			// multiplied by t^i
-		tmvTemp2.nctrunc(order);
+//		tmvTemp2.nctrunc(order);
 
 		taylorExpansion.add_assign(tmvTemp2);
 
@@ -7567,24 +7933,28 @@ void computeTaylorExpansion(TaylorModelVec & result, const TaylorModelVec & firs
 	// we compute the Taylor expansion (without the 0-order term)
 	TaylorModelVec taylorExpansion;
 	first_order_deriv.evaluate_t(taylorExpansion, intVecZero);
+/*
+	for(int i=0; i<rangeDim; ++i)
+	{
+		taylorExpansion.tms[i].nctrunc(orders[i] - 1);
+	}
+*/
 	taylorExpansion.mul_assign(0, 1);
 
 	TaylorModelVec tmvLieDeriv_n = first_order_deriv;
 
 	for(int i=0; i<rangeDim; ++i)
 	{
-		Interval intFactor(1);
 		for(int j=2; j<=orders[i]; ++j)
 		{
-			intFactor.div_assign((double)j);
 			TaylorModel tmTemp;
-			tmvLieDeriv_n.tms[i].LieDerivative_no_remainder(tmTemp, ode, orders[i]);
+			tmvLieDeriv_n.tms[i].LieDerivative_no_remainder(tmTemp, ode, orders[i] - j);
 
 			TaylorModel tmTemp2;
 			tmTemp.evaluate_t(tmTemp2, intVecZero);
-			tmTemp2.mul_assign(intFactor);
+			tmTemp2.mul_assign(factorial_rec[j]);
 			tmTemp2.mul_assign(0,j);
-			tmTemp2.nctrunc(orders[i]);
+//			tmTemp2.nctrunc(orders[i]);
 
 			taylorExpansion.tms[i].add_assign(tmTemp2);
 
@@ -8043,6 +8413,11 @@ int contract_interval_arithmetic(TaylorModelVec & flowpipe, vector<Interval> & d
 		}
 	}
 
+	if(bvalid)
+	{
+		boundary_intersected_collection(pcs, objHF, remainders, domain, boundary_intersected);
+	}
+
 	// normalize the contracted flowpipe
 	flowpipe.normalize(domain);
 
@@ -8060,3 +8435,37 @@ int contract_interval_arithmetic(TaylorModelVec & flowpipe, vector<Interval> & d
 		return 1;
 	}
 }
+
+void gridBox(list<vector<Interval> > & grids, const vector<Interval> & box, const int num)
+{
+	grids.clear();
+	grids.push_back(box);
+
+	for(int i=0; i<box.size(); ++i)
+	{
+		list<vector<Interval> >::iterator gridIter;
+		list<vector<Interval> > newGrids;
+
+		for(; grids.size() > 0;)
+		{
+			gridIter = grids.begin();
+
+			list<Interval> queue;
+			(*gridIter)[i].split(queue, num);
+
+			list<Interval>::iterator iterComponent = queue.begin();
+			for(; iterComponent != queue.end(); ++iterComponent)
+			{
+				vector<Interval> tmpBox = *gridIter;
+				tmpBox[i] = *iterComponent;
+				newGrids.push_back(tmpBox);
+			}
+
+			grids.pop_front();
+		}
+
+		grids = newGrids;
+	}
+}
+
+

@@ -41,6 +41,7 @@ public:
 	void ctrunc_normal(const vector<Interval> & step_exp_table, const int order);
 
 	void inv(TaylorModel & result) const;									// additive inverse
+	void inv_assign();
 
 	void add(TaylorModel & result, const TaylorModel & tm) const;			// addition
 	void sub(TaylorModel & result, const TaylorModel & tm) const;			// subtraction
@@ -50,21 +51,23 @@ public:
 	void mul_ctrunc(TaylorModel & result, const TaylorModel & tm, const vector<Interval> & domain, const int order) const;
 	void mul_ctrunc_normal(TaylorModel & result, const TaylorModel & tm, const vector<Interval> & step_exp_table, const int order) const;
 	void mul_no_remainder(TaylorModel & result, const TaylorModel & tm, const int order) const;
-	void mul_no_remainder_no_rounding(TaylorModel & result, const TaylorModel & tm, const int order) const;
+	void mul_no_remainder_no_cutoff(TaylorModel & result, const TaylorModel & tm, const int order) const;
 	void mul(TaylorModel & result, const Interval & I) const;
 
 	void mul_ctrunc_assign(const TaylorModel & tm, const vector<Interval> & domain, const int order);
 	void mul_ctrunc_normal_assign(const TaylorModel & tm, const vector<Interval> & step_exp_table, const int order);
 	void mul_no_remainder_assign(const TaylorModel & tm, const int order);
-	void mul_no_remainder_no_rounding_assign(const TaylorModel & tm, const int order);
+	void mul_no_remainder_no_cutoff_assign(const TaylorModel & tm, const int order);
 	void mul_assign(const Interval & I);
 
 	void mul_insert(TaylorModel & result, const TaylorModel & tm, const Interval & tmPolyRange, const vector<Interval> & domain) const;
+	void mul_insert_normal(TaylorModel & result, const TaylorModel & tm, const Interval & tmPolyRange, const vector<Interval> & step_exp_table) const;
 	void mul_insert_ctrunc(TaylorModel & result, const TaylorModel & tm, const Interval & tmPolyRange, const vector<Interval> & domain, const int order) const;
 	void mul_insert_ctrunc_normal(TaylorModel & result, const TaylorModel & tm, const Interval & tmPolyRange, const vector<Interval> & step_exp_table, const int order) const;
 	void mul_insert_ctrunc_normal(TaylorModel & result, Interval & tm1, Interval & intTrunc, const TaylorModel & tm, const Interval & tmPolyRange, const vector<Interval> & step_exp_table, const int order) const;
 
 	void mul_insert_assign(const TaylorModel & tm, const Interval & tmPolyRange, const vector<Interval> & domain);
+	void mul_insert_normal_assign(const TaylorModel & tm, const Interval & tmPolyRange, const vector<Interval> & step_exp_table);
 	void mul_insert_ctrunc_assign(const TaylorModel & tm, const Interval & tmPolyRange, const vector<Interval> & domain, const int order);
 	void mul_insert_ctrunc_normal_assign(const TaylorModel & tm, const Interval & tmPolyRange, const vector<Interval> & step_exp_table, const int order);
 	void mul_insert_ctrunc_normal_assign(Interval & tm1, Interval & intTrunc, const TaylorModel & tm, const Interval & tmPolyRange, const vector<Interval> & step_exp_table, const int order);
@@ -75,9 +78,7 @@ public:
 	void derivative(TaylorModel & result, const int varIndex) const;		// derivative with respect to a variable
 
 	// Lie derivative, the vector field is given by f
-//	void LieDerivative_ctrunc(TaylorModel & result, const TaylorModelVec & f, const vector<Interval> & domain, const int order) const;
 	void LieDerivative_no_remainder(TaylorModel & result, const TaylorModelVec & f, const int order) const;
-//	void LieDerivative_ctrunc_normal(TaylorModel & result, const TaylorModelVec & f, const vector<Interval> & step_exp_table, const int order) const;
 
 	void integral(TaylorModel & result, const Interval & I) const;				// Integral with respect to t
 	void integral_no_remainder(TaylorModel & result) const;
@@ -88,7 +89,7 @@ public:
 	void insert(TaylorModel & result, const TaylorModelVec & vars, const vector<Interval> & varsPolyRange, const vector<Interval> & domain) const;
 	void insert_ctrunc(TaylorModel & result, const TaylorModelVec & vars, const vector<Interval> & varsPolyRange, const vector<Interval> & domain, const int order) const;
 	void insert_no_remainder(TaylorModel & result, const TaylorModelVec & vars, const int numVars, const int order) const;
-	void insert_no_remainder_no_rounding(TaylorModel & result, const TaylorModelVec & vars, const int numVars, const int order) const;
+	void insert_no_remainder_no_cutoff(TaylorModel & result, const TaylorModelVec & vars, const int numVars, const int order) const;
 	void insert_ctrunc_normal(TaylorModel & result, const TaylorModelVec & vars, const vector<Interval> & varsPolyRange, const vector<Interval> & step_exp_table, const int numVars, const int order) const;
 
 	void evaluate_t(TaylorModel & result, const vector<Interval> & step_exp_table) const;			// evaluate the Taylor model at time t
@@ -113,6 +114,8 @@ public:
 	void rec_taylor(TaylorModel & result, list<Interval> & ranges, const vector<Interval> & step_exp_table, const int numVars, const int order) const;
 	void sin_taylor(TaylorModel & result, list<Interval> & ranges, const vector<Interval> & step_exp_table, const int numVars, const int order) const;
 	void cos_taylor(TaylorModel & result, list<Interval> & ranges, const vector<Interval> & step_exp_table, const int numVars, const int order) const;
+	void log_taylor(TaylorModel & result, list<Interval> & ranges, const vector<Interval> & step_exp_table, const int numVars, const int order) const;
+	void sqrt_taylor(TaylorModel & result, list<Interval> & ranges, const vector<Interval> & step_exp_table, const int numVars, const int order) const;
 
 	Interval getRemainder() const;
 	void getExpansion(Polynomial & P) const;
@@ -216,24 +219,26 @@ public:
 	void Picard_ctrunc_normal(TaylorModelVec & result, vector<RangeTree *> & trees, const TaylorModelVec & x0, const vector<Interval> & polyRange, const vector<HornerForm> & ode, const vector<Interval> & step_exp_table, const int numVars, const vector<int> & orders) const;
 	void Picard_only_remainder(vector<Interval> & result, vector<RangeTree *> & trees, const TaylorModelVec & x0, const vector<HornerForm> & ode, const Interval & timeStep) const;
 
-	void Picard_no_remainder(TaylorModelVec & result, const TaylorModelVec & x0, const vector<HornerForm> & ode, const int numVars, const vector<int> & orders) const;
-	void Picard_no_remainder_assign(const TaylorModelVec & x0, const vector<HornerForm> & ode, const int numVars, const vector<int> & orders);
+	void Picard_no_remainder(TaylorModelVec & result, const TaylorModelVec & x0, const vector<HornerForm> & ode, const int numVars, const vector<int> & orders, const vector<bool> & bIncreased) const;
+	void Picard_no_remainder_assign(const TaylorModelVec & x0, const vector<HornerForm> & ode, const int numVars, const vector<int> & orders, const vector<bool> & bIncreased);
 	void Picard_ctrunc_normal(TaylorModelVec & result, const TaylorModelVec & x0, const vector<Interval> & polyRange, const vector<HornerForm> & ode, const vector<Interval> & step_exp_table, const int numVars, const vector<int> & orders) const;
 	void Picard_ctrunc_normal_assign(const TaylorModelVec & x0, const vector<Interval> & polyRange, const vector<HornerForm> & ode, const vector<Interval> & step_exp_table, const int numVars, const vector<int> & orders);
 
-	void Picard_non_polynomial_no_remainder(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const int order, const vector<Interval> & uncertainty_centers) const;
-	void Picard_non_polynomial_no_remainder_assign(const TaylorModelVec & x0, const vector<string> & strOde, const int order, const vector<Interval> & uncertainty_centers);
+	// using Taylor approximation
+	void Picard_non_polynomial_taylor_no_remainder(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const int order, const vector<Interval> & uncertainty_centers) const;
+	void Picard_non_polynomial_taylor_no_remainder_assign(const TaylorModelVec & x0, const vector<string> & strOde, const int order, const vector<Interval> & uncertainty_centers);
 
-	void Picard_non_polynomial_no_remainder(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const vector<int> & orders, const vector<Interval> & uncertainty_centers) const;
-	void Picard_non_polynomial_no_remainder_assign(const TaylorModelVec & x0, const vector<string> & strOde, const vector<int> & orders, const vector<Interval> & uncertainty_centers);
+	void Picard_non_polynomial_taylor_no_remainder(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const vector<int> & orders, const vector<bool> & bIncreased, const vector<Interval> & uncertainty_centers) const;
+	void Picard_non_polynomial_taylor_no_remainder_assign(const TaylorModelVec & x0, const vector<string> & strOde, const vector<int> & orders, const vector<bool> & bIncreased, const vector<Interval> & uncertainty_centers);
 
-	void Picard_non_polynomial_ctrunc_normal(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const int order, const vector<Interval> & uncertainty_centers) const;
-	void Picard_non_polynomial_ctrunc_normal_assign(const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const int order, const vector<Interval> & uncertainty_centers);
+	void Picard_non_polynomial_taylor_ctrunc_normal(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const int order, const vector<Interval> & uncertainty_centers) const;
+	void Picard_non_polynomial_taylor_ctrunc_normal_assign(const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const int order, const vector<Interval> & uncertainty_centers);
 
-	void Picard_non_polynomial_ctrunc_normal(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const vector<int> & orders, const vector<Interval> & uncertainty_centers) const;
-	void Picard_non_polynomial_ctrunc_normal_assign(const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const vector<int> & orders, const vector<Interval> & uncertainty_centers);
+	void Picard_non_polynomial_taylor_ctrunc_normal(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const vector<int> & orders, const vector<Interval> & uncertainty_centers) const;
+	void Picard_non_polynomial_taylor_ctrunc_normal_assign(const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const vector<int> & orders, const vector<Interval> & uncertainty_centers);
 
-	void Picard_non_polynomial_only_remainder(vector<Interval> & result, const TaylorModelVec & x0, const vector<string> & strOde, const Interval & timeStep) const;
+	void Picard_non_polynomial_taylor_only_remainder(vector<Interval> & result, const TaylorModelVec & x0, const vector<string> & strOde, const Interval & timeStep, const int order) const;
+	void Picard_non_polynomial_taylor_only_remainder(vector<Interval> & result, const TaylorModelVec & x0, const vector<string> & strOde, const Interval & timeStep, const vector<int> & orders) const;
 
 	void normalize(vector<Interval> & domain);		// we assume that the original domain is full-dimensional
 
@@ -247,15 +252,12 @@ class ParseSetting
 {
 public:
 	string strODE;
-	list<Interval> ranges;
-	vector<Interval> step_exp_table;
 
+	list<Interval> ranges;
 	list<Interval>::iterator iterRange;
 
+	vector<Interval> step_exp_table;
 	TaylorModelVec flowpipe;
-
-	vector<string> strReplace;
-
 	int order;
 
 	ParseSetting();
@@ -273,8 +275,6 @@ public:
 	Polynomial expansion;
 	Interval remainder;
 
-	string replaceResult;
-
 	ParseResult();
 	ParseResult(const ParseResult & result);
 	~ParseResult();
@@ -286,14 +286,15 @@ void exp_taylor_remainder(Interval & result, const Interval & tmRange, const int
 void rec_taylor_remainder(Interval & result, const Interval & tmRange, const int order);
 void sin_taylor_remainder(Interval & result, const Interval & C, const Interval & tmRange, const int order);
 void cos_taylor_remainder(Interval & result, const Interval & C, const Interval & tmRange, const int order);
+void log_taylor_remainder(Interval & result, const Interval & tmRange, const int order);
+void sqrt_taylor_remainder(Interval & result, const Interval & tmRange, const int order);
 
 void exp_taylor_only_remainder(Interval & result, const Interval & remainder, list<Interval>::iterator & iterRange, const int order);
 void rec_taylor_only_remainder(Interval & result, const Interval & remainder, list<Interval>::iterator & iterRange, const int order);
 void sin_taylor_only_remainder(Interval & result, const Interval & remainder, list<Interval>::iterator & iterRange, const int order);
 void cos_taylor_only_remainder(Interval & result, const Interval & remainder, list<Interval>::iterator & iterRange, const int order);
-
-class ParseSetting;
-class ParseResult;
+void log_taylor_only_remainder(Interval & result, const Interval & remainder, list<Interval>::iterator & iterRange, const int order);
+void sqrt_taylor_only_remainder(Interval & result, const Interval & remainder, list<Interval>::iterator & iterRange, const int order);
 
 extern ParseSetting parseSetting;
 extern ParseResult parseResult;

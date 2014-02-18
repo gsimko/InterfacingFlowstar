@@ -33,13 +33,14 @@ public:
 class DiscTrans
 {
 public:
+	int jumpID;
 	int startID;
 	int targetID;
 	vector<PolynomialConstraint> guard;
 	ResetMap resetMap;
 public:
 	DiscTrans();
-	DiscTrans(const int start, const int target, const vector<PolynomialConstraint> & lcs, const ResetMap & reset);
+	DiscTrans(const int id, const int start, const int target, const vector<PolynomialConstraint> & lcs, const ResetMap & reset);
 	DiscTrans(const DiscTrans & trans);
 	~DiscTrans();
 
@@ -49,24 +50,19 @@ public:
 class TreeNode
 {
 public:
-	unsigned int modeID;
+	int jumpID;
+	int modeID;
+	Interval localTime;
 	TreeNode *parent;
 	list<TreeNode *> children;
 
-	TreeNode(const unsigned int id);
+	TreeNode(const int jump, const int mode, const Interval & t);
 	TreeNode(const TreeNode & node);
 	~TreeNode();
 
-	TreeNode & operator = (const TreeNode & node);
-};
+	void dump(FILE *fp, const string & prefix, const vector<string> & modeNames) const;
 
-class ComputationTree
-{
-public:
-	TreeNode *root;
-public:
-	ComputationTree();
-	~ComputationTree();
+	TreeNode & operator = (const TreeNode & node);
 };
 
 class HybridSystem
@@ -150,39 +146,39 @@ public:
 			const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames,
 			vector<bool> & invariant_boundary_intersected, const vector<string> & modeNames) const;
 
-	// for non-polynomial ODEs
+	// for non-polynomial ODEs (using Taylor approximations)
 	// fixed step sizes and orders
-	bool reach_continuous_non_polynomial(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
+	bool reach_continuous_non_polynomial_taylor(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
 			const double step, const double time, const int order, const int precondition, const vector<Interval> & estimation, const bool bPrint,
 			const vector<string> & stateVarNames, vector<bool> & invariant_boundary_intersected, const vector<string> & modeNames) const;
-	bool reach_continuous_non_polynomial(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
+	bool reach_continuous_non_polynomial_taylor(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
 			const double step, const double time, const vector<int> & orders, const int globalMaxOrder, const int precondition,
 			const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames,
 			vector<bool> & invariant_boundary_intersected, const vector<string> & modeNames) const;
 
 	// adaptive step sizes and fixed orders
-	bool reach_continuous_non_polynomial(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
+	bool reach_continuous_non_polynomial_taylor(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
 			const double step, const double miniStep, const double time, const int order, const int precondition,
 			const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames,
 			vector<bool> & invariant_boundary_intersected, const vector<string> & modeNames) const;
-	bool reach_continuous_non_polynomial(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
+	bool reach_continuous_non_polynomial_taylor(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
 			const double step, const double miniStep, const double time, const vector<int> & orders, const int globalMaxOrder,
 			const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames,
 			vector<bool> & invariant_boundary_intersected, const vector<string> & modeNames) const;
 
 	// adaptive orders and fixed step sizes
-	bool reach_continuous_non_polynomial(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
+	bool reach_continuous_non_polynomial_taylor(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
 			const double step, const double time, const int order, const int maxOrder, const int precondition, const vector<Interval> & estimation,
 			const bool bPrint, const vector<string> & stateVarNames, vector<bool> & invariant_boundary_intersected,
 			const vector<string> & modeNames) const;
-	bool reach_continuous_non_polynomial(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
+	bool reach_continuous_non_polynomial_taylor(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
 			const double step, const double time, const vector<int> & orders, const vector<int> & maxOrders, const int globalMaxOrder,
 			const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames,
 			vector<bool> & invariant_boundary_intersected, const vector<string> & modeNames) const;
 
 	// hybrid reachability
 	void reach_hybrid(list<list<TaylorModelVec> > & resultsCompo, list<list<vector<Interval> > > & domains, list<int> & modeIDs,
-			list<TreeNode *> & traceNodes, ComputationTree & traceTree, const vector<int> & integrationSchemes, const double step, const double miniStep,
+			list<TreeNode *> & traceNodes, TreeNode * & traceTree, const vector<int> & integrationSchemes, const double step, const double miniStep,
 			const double time, const int orderType, const vector<int> & orders, const vector<int> & maxOrders, const int globalMaxOrder,
 			const bool bAdaptiveSteps, const bool bAdaptiveOrders, const int maxJmps, const int precondition, const vector<Interval> & estimation,
 			const vector<vector<int> > & aggregType, const vector<vector<vector<RowVector> > > aggregationTemplate_candidates, const vector<RowVector> default_aggregation_template,
@@ -203,6 +199,7 @@ public:
 	int precondition;			// the preconditioning technique
 	vector<int> outputAxes;		// the output axes
 	int plotSetting;
+	int plotFormat;
 	int numSections;			// the number of sections in each dimension
 
 	int orderType;
@@ -214,14 +211,16 @@ public:
 	vector<int> orders;			// the order(s)
 	vector<int> maxOrders;		// the maximum orders
 	int globalMaxOrder;
+
 	int maxJumps;
+	int numOfJumps;
 
 	bool bPrint;
 	bool bSafetyChecking;
 
 	vector<int> integrationSchemes;
 
-	ComputationTree traceTree;
+	TreeNode *traceTree;
 
 	vector<bool> bVecUnderCheck;
 
@@ -262,10 +261,17 @@ public:
 
 	void run();
 
-	void output_2D_GNUPLOT(FILE *fp) const;
-	void output_2D_interval_GNUPLOT(FILE *fp) const;
-	void output_2D_octagon_GNUPLOT(FILE *fp) const;
-	void output_2D_grid_GNUPLOT(FILE *fp) const;
+	void plot_2D() const;
+
+	void plot_2D_GNUPLOT(FILE *fp) const;
+	void plot_2D_interval_GNUPLOT(FILE *fp) const;
+	void plot_2D_octagon_GNUPLOT(FILE *fp) const;
+	void plot_2D_grid_GNUPLOT(FILE *fp) const;
+
+	void plot_2D_MATLAB(FILE *fp) const;
+	void plot_2D_interval_MATLAB(FILE *fp) const;
+	void plot_2D_octagon_MATLAB(FILE *fp) const;
+	void plot_2D_grid_MATLAB(FILE *fp) const;
 
 	bool declareStateVar(const string & vName);
 	int getIDForStateVar(const string & vName) const;
@@ -290,7 +296,7 @@ public:
 
 	int safetyChecking();
 	unsigned long numOfFlowpipes() const;
-	void dump_skeptical_counter_example(FILE *fp, const TaylorModelVec & flowpipe, const vector<Interval> & domain, const int modeID, TreeNode * const node) const;
+	void dump_potential_counterexample(FILE *fp, const list<TaylorModelVec> & flowpipes, const list<vector<Interval> > & domains, TreeNode * const node, const list<Interval> & globalTimes) const;
 
 	// parallelotopic aggregation
 	friend void aggregate_flowpipes_by_Parallelotope(TaylorModelVec & tmvAggregation, vector<Interval> & doAggregation, const vector<TaylorModelVec> & flowpipes,
@@ -314,6 +320,8 @@ public:
 	friend bool compareIntercept(const FactorTab & a, const FactorTab & b);
 };
 
+void generateNodeSeq(list<TreeNode *> & result, TreeNode *root);
+
 // interval aggregation
 void aggregate_flowpipes_by_interval(TaylorModelVec & tmvAggregation, vector<Interval> & doAggregation, const vector<TaylorModelVec> & flowpipes, const vector<vector<Interval> > & domains);
 
@@ -324,5 +332,6 @@ void aggregate_flowpipes_by_Parallelotope(TaylorModelVec & tmvAggregation, vecto
 		const vector<vector<Interval> > & domains, const vector<PolynomialConstraint> & invariant, const DiscTrans & jump, vector<bool> & boundary_intersected,
 		const vector<RowVector> & template_candidates, const vector<RowVector> & template_default, const vector<vector<Matrix> > & weightTab,
 		const vector<vector<vector<bool> > > & linear_auto, const vector<vector<vector<RowVector> > > & template_auto, const int globalMaxOrder, const int rangeDim);
+
 
 #endif /* HYBRID_H_ */

@@ -35,7 +35,7 @@ DLLEXPORT void CDECL DumpContinuousSystem(ContinuousSystem* system, int numVars,
 DLLEXPORT void CDECL SetODEContinuousSystem(ContinuousSystem* system, TaylorModelVec* tmvOde)
 {
 	system->tmvOde = TaylorModelVec(*tmvOde);
-	
+	system->hfOde.clear();
 	int rangeDim = tmvOde->tms.size();
 	for(int i=0; i<rangeDim; ++i)
 	{
@@ -54,8 +54,25 @@ DLLEXPORT void CDECL SetInitialSetContinuousSystem(ContinuousSystem* system, Flo
 {
 	system->initialSet = *initialSet;
 }
+
+int globalMaxOrder = -1;
+void setGlobalMaxOrder(int order)
+{
+	if (order != globalMaxOrder)
+	{
+		globalMaxOrder = order;
+		factorial_rec.clear();
+		power_4.clear();
+		double_factorial.clear();
+		compute_factorial_rec(globalMaxOrder+1);
+		compute_power_4(globalMaxOrder+1);		
+		compute_double_factorial(2*globalMaxOrder);
+	}
+}
+
 DLLEXPORT Flowpipe* CDECL ReachLowDegreeContinuousSystem(ContinuousSystem* system, double step, double time, int order, int precondition, int numVars, double* estimation, bool bPrint, const char** varNames)
 {
+	setGlobalMaxOrder(order);
 	vector<Interval> est;	
 	vector<string> localVarNames;
 	for (int i = 0; i < numVars; ++i)
@@ -65,8 +82,11 @@ DLLEXPORT Flowpipe* CDECL ReachLowDegreeContinuousSystem(ContinuousSystem* syste
 	}
 	list<Flowpipe> flowpipes;
 	bool nextEst = true;	
-	if (!system->reach_low_degree(flowpipes, step, time, order, precondition, est, bPrint, localVarNames))
-		return (Flowpipe*)0;
+	//if (!system->reach_low_degree(flowpipes, step, time, order, precondition, est, bPrint, localVarNames))
+//		return (Flowpipe*)0;
+	system->reach_low_degree(flowpipes, step, time, order, precondition, est, bPrint, localVarNames);
+	// What happens if cannot solve?
+	
 	/*while (!system->reach_low_degree(flowpipes, step, time, order, precondition, est, bPrint, localVarNames))
 	{
 		if (nextEst)
@@ -96,6 +116,7 @@ DLLEXPORT Flowpipe* CDECL ReachLowDegreeContinuousSystem(ContinuousSystem* syste
 }
 DLLEXPORT Flowpipe* CDECL ReachLowDegreeAdaptiveStepContinuousSystem(ContinuousSystem* system, double step, double* miniStep, double time, int order, int precondition, int numVars, double* estimation, bool bPrint, const char** stateVarNames)
 {
+	setGlobalMaxOrder(order);
 	vector<Interval> est;
 	vector<string> varNames;
 	for (int i = 0; i < numVars; ++i)
@@ -104,8 +125,13 @@ DLLEXPORT Flowpipe* CDECL ReachLowDegreeAdaptiveStepContinuousSystem(ContinuousS
 		varNames.push_back(stateVarNames[i]);
 	}
 	list<Flowpipe> flowpipes;
-	if (!system->reach_low_degree(flowpipes, step, *miniStep, time, order, precondition, est, bPrint, varNames))
-		return (Flowpipe*)0;
+	//if (!system->reach_low_degree(flowpipes, step, *miniStep, time, order, precondition, est, bPrint, varNames))
+		//return (Flowpipe*)0;	
+	try {
+		system->reach_low_degree(flowpipes, step, *miniStep, time, order, precondition, est, bPrint, varNames);
+	} catch (RemainderException &e)	{
+		return (Flowpipe*)0;	
+	}
 	
 	for (int i = 0; i < numVars; ++i)
 		estimation[i] = est[i].sup();
@@ -114,6 +140,7 @@ DLLEXPORT Flowpipe* CDECL ReachLowDegreeAdaptiveStepContinuousSystem(ContinuousS
 }
 DLLEXPORT Flowpipe* CDECL ReachLowDegreeAdaptiveOrderContinuousSystem(ContinuousSystem* system, double step, double time, int order, int maxOrder, int numVars, double* estimation, const char** stateVarNames)
 {
+	setGlobalMaxOrder(order);
 	vector<Interval> est;	
 	vector<string> varNames;
 	for (int i = 0; i < numVars; ++i)
@@ -127,6 +154,7 @@ DLLEXPORT Flowpipe* CDECL ReachLowDegreeAdaptiveOrderContinuousSystem(Continuous
 }
 DLLEXPORT Flowpipe* CDECL ReachHighDegreeContinuousSystem(ContinuousSystem* system, double step, double time, int order, int numVars, double* estimation, const char** stateVarNames)
 {
+	setGlobalMaxOrder(order);
 	vector<Interval> est;	
 	vector<string> varNames;
 	for (int i = 0; i < numVars; ++i)
@@ -140,6 +168,7 @@ DLLEXPORT Flowpipe* CDECL ReachHighDegreeContinuousSystem(ContinuousSystem* syst
 }
 DLLEXPORT Flowpipe* CDECL ReachHighDegreeAdaptiveStepContinuousSystem(ContinuousSystem* system, double step, double* miniStep, double time, int order, int numVars, double* estimation, const char** stateVarNames)
 {
+	setGlobalMaxOrder(order);
 	vector<Interval> est;	
 	vector<string> varNames;
 	for (int i = 0; i < numVars; ++i)
@@ -153,6 +182,7 @@ DLLEXPORT Flowpipe* CDECL ReachHighDegreeAdaptiveStepContinuousSystem(Continuous
 }
 DLLEXPORT Flowpipe* CDECL ReachHighDegreeAdaptiveOrderContinuousSystem(ContinuousSystem* system, double step, double time, int order, int maxOrder, int numVars, double* estimation, const char** stateVarNames)
 {
+	setGlobalMaxOrder(order);
 	vector<Interval> est;	
 	vector<string> varNames;
 	for (int i = 0; i < numVars; ++i)
@@ -166,6 +196,7 @@ DLLEXPORT Flowpipe* CDECL ReachHighDegreeAdaptiveOrderContinuousSystem(Continuou
 }
 DLLEXPORT Flowpipe* CDECL ReachNonPolynomialContinuousSystem(ContinuousSystem* system, double step, double time, int order, int precondition, int numVars, double* estimation, bool bPrint, const char** stateVarNames)
 {
+	setGlobalMaxOrder(order);
 	vector<Interval> est;
 	vector<string> varNames;
 	for (int i = 0; i < numVars; ++i)
@@ -175,8 +206,9 @@ DLLEXPORT Flowpipe* CDECL ReachNonPolynomialContinuousSystem(ContinuousSystem* s
 	}
 	list<Flowpipe> flowpipes;	
 	bool nextEst = true;
-	if (!system->reach_non_polynomial(flowpipes, step, time, order, precondition, est, bPrint, varNames))
-		return (Flowpipe*)0;
+	//if (!system->reach_non_polynomial(flowpipes, step, time, order, precondition, est, bPrint, varNames))
+		//return (Flowpipe*)0;
+	system->reach_non_polynomial_taylor(flowpipes, step, time, order, precondition, est, bPrint, varNames);
 	
 	for (int i = 0; i < numVars; ++i)
 		estimation[i] = est[i].sup();
@@ -185,6 +217,7 @@ DLLEXPORT Flowpipe* CDECL ReachNonPolynomialContinuousSystem(ContinuousSystem* s
 }
 DLLEXPORT Flowpipe* CDECL ReachNonPolynomialAdaptiveStepContinuousSystem(ContinuousSystem* system, double step, double* miniStep, double time, int order, int precondition, int numVars, double* estimation, bool bPrint, const char** stateVarNames)
 {
+	setGlobalMaxOrder(order);
 	vector<Interval> est;
 	vector<string> varNames;
 	for (int i = 0; i < numVars; ++i)
@@ -194,8 +227,9 @@ DLLEXPORT Flowpipe* CDECL ReachNonPolynomialAdaptiveStepContinuousSystem(Continu
 	}
 	list<Flowpipe> flowpipes;	
 	bool nextEst = true;
-	if (!system->reach_non_polynomial(flowpipes, step, *miniStep, time, order, precondition, est, bPrint, varNames))
-		return (Flowpipe*)0;
+	//if (!system->reach_non_polynomial(flowpipes, step, *miniStep, time, order, precondition, est, bPrint, varNames))
+		//return (Flowpipe*)0;
+	system->reach_non_polynomial_taylor(flowpipes, step, *miniStep, time, order, precondition, est, bPrint, varNames);
 	
 	for (int i = 0; i < numVars; ++i)
 		estimation[i] = est[i].sup();

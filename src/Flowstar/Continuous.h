@@ -67,18 +67,18 @@ public:
 
 
 
-	// integration scheme for non-polynomial ODEs
+	// integration scheme for non-polynomial ODEs (using Taylor approximations)
 	// fixed step sizes and orders
-	bool advance_non_polynomial(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const int order, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const;
-	bool advance_non_polynomial(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const vector<int> & orders, const int globalMaxOrder, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const;
+	bool advance_non_polynomial_taylor(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const int order, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const;
+	bool advance_non_polynomial_taylor(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const vector<int> & orders, const int globalMaxOrder, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const;
 
 	// adaptive step sizes and fixed orders
-	bool advance_non_polynomial(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const double step, const double miniStep, const int order, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const;
-	bool advance_non_polynomial(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const double step, const double miniStep, const vector<int> & orders, const int globalMaxOrder, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const;
+	bool advance_non_polynomial_taylor(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const double step, const double miniStep, const int order, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const;
+	bool advance_non_polynomial_taylor(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, const double step, const double miniStep, const vector<int> & orders, const int globalMaxOrder, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const;
 
 	// adaptive orders and fixed step sizes
-	bool advance_non_polynomial(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, int & order, const int maxOrder, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const;
-	bool advance_non_polynomial(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, vector<int> & orders, const int localMaxOrder, const vector<int> & maxOrders, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const;
+	bool advance_non_polynomial_taylor(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, int & order, const int maxOrder, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const;
+	bool advance_non_polynomial_taylor(Flowpipe & result, const vector<string> & strOde, const int precondition, vector<Interval> & step_exp_table, vector<Interval> & step_end_exp_table, vector<int> & orders, const int localMaxOrder, const vector<int> & maxOrders, const vector<Interval> & estimation, const vector<Interval> & uncertainties, const vector<Interval> & uncertainty_centers) const;
 
 	Flowpipe & operator = (const Flowpipe & flowpipe);
 
@@ -90,7 +90,6 @@ public:
 
 class ContinuousSystem
 {
-//private:
 public:
 	TaylorModelVec tmvOde;
 	vector<HornerForm> hfOde;		// a Horner form of the ode
@@ -107,15 +106,15 @@ public:
 
 	// for low-degree ODEs
 	// fixed step sizes and orders
-	bool reach_low_degree(list<Flowpipe> & results, const double step, const double time, const int order, const int precondition, vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
+	void reach_low_degree(list<Flowpipe> & results, const double step, const double time, const int order, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
 	void reach_low_degree(list<Flowpipe> & results, const double step, const double time, const vector<int> & orders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
 
 	// adaptive step sizes and fixed orders
-	bool reach_low_degree(list<Flowpipe> & results, const double step, const double miniStep, const double time, const int order, const int precondition, vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
+	void reach_low_degree(list<Flowpipe> & results, const double step, const double miniStep, const double time, const int order, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
 	void reach_low_degree(list<Flowpipe> & results, const double step, const double miniStep, const double time, const vector<int> & orders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
 
 	// adaptive orders and fixed step sizes
-	void reach_low_degree(list<Flowpipe> & results, const double step, const double time, const int order, const int maxOrder, const int precondition, vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
+	void reach_low_degree(list<Flowpipe> & results, const double step, const double time, const int order, const int maxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
 	void reach_low_degree(list<Flowpipe> & results, const double step, const double time, const vector<int> & orders, const vector<int> & maxOrders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
 
 	// for high-degree ODEs
@@ -131,20 +130,18 @@ public:
 	void reach_high_degree(list<Flowpipe> & results, const double step, const double time, const int order, const int maxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
 	void reach_high_degree(list<Flowpipe> & results, const double step, const double time, const vector<int> & orders, const vector<int> & maxOrders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
 
-
-
-	// for non-polynomial ODEs
+	// for non-polynomial ODEs (using Taylor approximations)
 	// fixed step sizes and orders
-	bool reach_non_polynomial(list<Flowpipe> & results, const double step, const double time, const int order, const int precondition, vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
-	void reach_non_polynomial(list<Flowpipe> & results, const double step, const double time, const vector<int> & orders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
+	void reach_non_polynomial_taylor(list<Flowpipe> & results, const double step, const double time, const int order, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
+	void reach_non_polynomial_taylor(list<Flowpipe> & results, const double step, const double time, const vector<int> & orders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
 
 	// adaptive step sizes and fixed orders
-	bool reach_non_polynomial(list<Flowpipe> & results, const double step, const double miniStep, const double time, const int order, const int precondition, vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
-	void reach_non_polynomial(list<Flowpipe> & results, const double step, const double miniStep, const double time, const vector<int> & orders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
+	void reach_non_polynomial_taylor(list<Flowpipe> & results, const double step, const double miniStep, const double time, const int order, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
+	void reach_non_polynomial_taylor(list<Flowpipe> & results, const double step, const double miniStep, const double time, const vector<int> & orders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
 
 	// adaptive orders and fixed step sizes
-	void reach_non_polynomial(list<Flowpipe> & results, const double step, const double time, const int order, const int maxOrder, const int precondition, vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
-	void reach_non_polynomial(list<Flowpipe> & results, const double step, const double time, const vector<int> & orders, const vector<int> & maxOrders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
+	void reach_non_polynomial_taylor(list<Flowpipe> & results, const double step, const double time, const int order, const int maxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
+	void reach_non_polynomial_taylor(list<Flowpipe> & results, const double step, const double time, const vector<int> & orders, const vector<int> & maxOrders, const int globalMaxOrder, const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames) const;
 
 	ContinuousSystem & operator = (const ContinuousSystem & system);
 };
@@ -158,6 +155,7 @@ public:
 	int precondition;				// the preconditioning technique
 	vector<int> outputAxes;			// the output axes
 	int plotSetting;
+	int plotFormat;
 	int numSections;				// the number of sections in each dimension
 
 	int orderType;
@@ -199,10 +197,19 @@ public:
 	int safetyChecking() const;
 	unsigned long numOfFlowpipes() const;
 
-	void output_2D_GNUPLOT(FILE *fp) const;
-	void output_2D_interval_GNUPLOT(FILE *fp) const;
-	void output_2D_octagon_GNUPLOT(FILE *fp) const;
-	void output_2D_grid_GNUPLOT(FILE *fp) const;
+	void dump_potential_counterexample(FILE *fp, const list<TaylorModelVec> & flowpipes, const list<vector<Interval> > & domains, const list<Interval> & globalTimes) const;
+
+	void plot_2D() const;
+
+	void plot_2D_GNUPLOT(FILE *fp) const;
+	void plot_2D_interval_GNUPLOT(FILE *fp) const;
+	void plot_2D_octagon_GNUPLOT(FILE *fp) const;
+	void plot_2D_grid_GNUPLOT(FILE *fp) const;
+
+	void plot_2D_MATLAB(FILE *fp) const;
+	void plot_2D_interval_MATLAB(FILE *fp) const;
+	void plot_2D_octagon_MATLAB(FILE *fp) const;
+	void plot_2D_grid_MATLAB(FILE *fp) const;
 
 	bool declareStateVar(const string & vName);
 	int getIDForStateVar(const string & vName) const;
@@ -235,5 +242,7 @@ bool boundary_intersected_collection(const vector<PolynomialConstraint> & pcs, c
 
 // domain contraction by using interval arithmetic
 int contract_interval_arithmetic(TaylorModelVec & flowpipe, vector<Interval> & domain, const vector<PolynomialConstraint> & pcs, vector<bool> & boundary_intersected);
+
+void gridBox(list<vector<Interval> > & grids, const vector<Interval> & box, const int num);
 
 #endif /* CONTINUOUS_H_ */

@@ -2,6 +2,10 @@
   Flow*: A Taylor Model Based Flowpipe analyzer.
   Authors: Xin Chen, Erika Abraham and Sriram Sankaranarayanan.
   Email: Xin Chen <xin.chen@cs.rwth-aachen.de> if you have questions or comments.
+
+  Modification: Added mkdir macro to fix MinGW's lack of mkdir, and an exception class for "remainder errors".
+  Author: Gabor Simko
+  Date: 2/18/2014. 
   
   The code is released as is under the GNU General Public License (GPL). Please consult the file LICENSE.txt for
   further information.
@@ -32,14 +36,21 @@
 #include <gsl/gsl_linalg.h>
 #include <glpk.h>
 
-const int intervalNumPrecision = 53;
+#if defined(_WIN32)
+	#include <io.h>
+	#define mkdir(A,B) _mkdir(A)
+#endif
+class RemainderException : public std::exception {};
+
+const int normal_precision	=	53;
+const int high_precision	=	256;
 
 #define THRESHOLD_HIGH			1e-12
 #define THRESHOLD_LOW			1e-20
 
 #define STOP_RATIO				0.99
 
-#define PN 						10 			// the number of digits printed
+#define PN 						20 			// the number of digits printed
 #define INVALID 				-1e8
 
 #define DC_THRESHOLD_SEARCH 	1e-5
@@ -51,12 +62,17 @@ const int intervalNumPrecision = 53;
 #define UNIFORM			0
 #define MULTI			1
 
-#define LAMBDA			0.5
-#define NAME_SIZE		50
+#define LAMBDA_DOWN		0.5
+#define LAMBDA_UP		1.1
+
+#define NAME_SIZE		100
 
 #define UNSAFE			-1
 #define SAFE			1
 #define UNKNOWN			0
+
+#define PLOT_GNUPLOT	0
+#define PLOT_MATLAB		1
 
 #define PLOT_INTERVAL	0
 #define PLOT_OCTAGON	1
@@ -69,23 +85,29 @@ const int intervalNumPrecision = 53;
 #define MSG_SIZE		100
 #define NUM_LENGTH		50
 
-#define LOW_DEGREE		1
-#define HIGH_DEGREE		2
-#define NON_POLY		3
+#define LOW_DEGREE				1
+#define HIGH_DEGREE				2
+#define NONPOLY_TAYLOR			3
 
-#define PI_UP			3.141592654
-#define PI_LO			3.141592653
+const char str_pi_up[]	=	"3.14159265358979323846264338327950288419716939937511";
+const char str_pi_lo[]	=	"3.14159265358979323846264338327950288419716939937510";
 
 const char outputDir[] = "./outputs/";
 const char imageDir[] = "./images/";
-const char local_var_name[] = "local_x_";
+const char counterexampleDir[] = "./counterexamples/";
+const char local_var_name[] = "local_var_";
 
 const char str_prefix_taylor_picard[] = "taylor picard { ";
 const char str_prefix_taylor_remainder[] = "taylor remainder { ";
 const char str_prefix_taylor_polynomial[] = "taylor polynomial { ";
-const char str_prefix_replace[] = "replace { ";
+
+const char str_prefix_combination_picard[] = "combination picard { ";
+const char str_prefix_combination_remainder[] = "combination remainder { ";
+const char str_prefix_combination_polynomial[] = "combination polynomial { ";
 
 const char str_suffix[] = " }";
+
+const char str_counterexample_dumping_name_suffix[] = ".counterexample";
 
 extern int lineNum;
 

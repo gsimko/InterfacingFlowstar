@@ -9,8 +9,6 @@
 
 #include "Hybrid.h"
 
-bool debug;
-
 // class ResetMap
 
 ResetMap::ResetMap()
@@ -75,8 +73,9 @@ DiscTrans::DiscTrans()
 {
 }
 
-DiscTrans::DiscTrans(const int start, const int target, const vector<PolynomialConstraint> & lcs, const ResetMap & reset)
+DiscTrans::DiscTrans(const int id, const int start, const int target, const vector<PolynomialConstraint> & lcs, const ResetMap & reset)
 {
+	jumpID = id;
 	startID = start;
 	targetID = target;
 	guard = lcs;
@@ -85,6 +84,7 @@ DiscTrans::DiscTrans(const int start, const int target, const vector<PolynomialC
 
 DiscTrans::DiscTrans(const DiscTrans & trans)
 {
+	jumpID = trans.jumpID;
 	startID = trans.startID;
 	targetID = trans.targetID;
 	guard = trans.guard;
@@ -101,6 +101,7 @@ DiscTrans & DiscTrans::operator = (const DiscTrans & trans)
 	if(this == &trans)
 		return *this;
 
+	jumpID = trans.jumpID;
 	startID = trans.startID;
 	targetID = trans.targetID;
 	guard = trans.guard;
@@ -135,22 +136,67 @@ DiscTrans & DiscTrans::operator = (const DiscTrans & trans)
 
 // computation tree
 
-TreeNode::TreeNode(const unsigned int id)
+TreeNode::TreeNode(const int jump, const int mode, const Interval & t)
 {
-	modeID = id;
+	jumpID = jump;
+	modeID = mode;
+	localTime = t;
 	parent = NULL;
 }
 
 TreeNode::TreeNode(const TreeNode & node)
 {
+	jumpID = node.jumpID;
 	modeID = node.modeID;
+	localTime = node.localTime;
 	parent = node.parent;
 	children = node.children;
 }
 
 TreeNode::~TreeNode()
 {
+	list<TreeNode *>::iterator iter = children.begin();
+
+	for(; iter!=children.end(); ++iter)
+	{
+		delete *iter;
+	}
+
 	children.clear();
+}
+
+void TreeNode::dump(FILE *fp, const string & prefix, const vector<string> & modeNames) const
+{
+	char buffer[NAME_SIZE];
+
+	if(jumpID == 0)
+	{
+		sprintf(buffer, "%s", modeNames[modeID].c_str());
+	}
+	else
+	{
+		string strTime;
+		localTime.toString(strTime);
+
+		sprintf(buffer, " ( %d , %s ) -> %s", jumpID, strTime.c_str(), modeNames[modeID].c_str());
+	}
+
+	string strTemp(buffer);
+	string strPath = prefix + strTemp;
+
+	if(children.size() == 0)
+	{
+		fprintf(fp, "%s;\n\n", strPath.c_str());
+	}
+	else
+	{
+		list<TreeNode *>::const_iterator iter = children.begin();
+
+		for(; iter!=children.end(); ++iter)
+		{
+			(*iter)->dump(fp, strPath, modeNames);
+		}
+	}
 }
 
 TreeNode & TreeNode::operator = (const TreeNode & node)
@@ -158,51 +204,15 @@ TreeNode & TreeNode::operator = (const TreeNode & node)
 	if(this == &node)
 		return *this;
 
+	jumpID = node.jumpID;
 	modeID = node.modeID;
+	localTime = node.localTime;
 	parent = node.parent;
 	children = node.children;
 	return *this;
 }
 
 
-
-
-ComputationTree::ComputationTree()
-{
-	root = NULL;
-}
-
-ComputationTree::~ComputationTree()
-{
-	TreeNode *pnode;
-
-	for(pnode=root; pnode!=NULL; )
-	{
-		while(pnode->children.size() > 0)
-		{
-			pnode = pnode->children.front();
-		}
-
-		TreeNode *parent = pnode->parent;
-		delete pnode;
-
-		if(parent == NULL)
-		{
-			break;
-		}
-
-		parent->children.pop_front();
-
-		if(parent->children.size() > 0)
-		{
-			pnode = parent->children.front();
-		}
-		else
-		{
-			pnode = parent;
-		}
-	}
-}
 
 
 
@@ -404,7 +414,7 @@ bool HybridSystem::reach_continuous_low_degree(list<TaylorModelVec> & resultsCom
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -519,7 +529,7 @@ bool HybridSystem::reach_continuous_low_degree(list<TaylorModelVec> & resultsCom
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -630,7 +640,7 @@ bool HybridSystem::reach_continuous_low_degree(list<TaylorModelVec> & resultsCom
 				printf("order = %d\n", order);
 			}
 
-			double newStep = step_exp_table[1].sup() / LAMBDA;
+			newStep = step_exp_table[1].sup() * LAMBDA_UP;
 			if(newStep > step - THRESHOLD_HIGH)
 			{
 				newStep = 0;
@@ -638,7 +648,7 @@ bool HybridSystem::reach_continuous_low_degree(list<TaylorModelVec> & resultsCom
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -753,7 +763,7 @@ bool HybridSystem::reach_continuous_low_degree(list<TaylorModelVec> & resultsCom
 				printf("%s : %d\n", stateVarNames[num].c_str(), orders[num]);
 			}
 
-			double newStep = step_exp_table[1].sup() / LAMBDA;
+			newStep = step_exp_table[1].sup() * LAMBDA_UP;
 			if(newStep > step - THRESHOLD_HIGH)
 			{
 				newStep = 0;
@@ -761,7 +771,7 @@ bool HybridSystem::reach_continuous_low_degree(list<TaylorModelVec> & resultsCom
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -894,7 +904,7 @@ bool HybridSystem::reach_continuous_low_degree(list<TaylorModelVec> & resultsCom
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -1058,7 +1068,7 @@ bool HybridSystem::reach_continuous_low_degree(list<TaylorModelVec> & resultsCom
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -1160,7 +1170,7 @@ bool HybridSystem::reach_continuous_high_degree(list<TaylorModelVec> & resultsCo
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -1266,7 +1276,7 @@ bool HybridSystem::reach_continuous_high_degree(list<TaylorModelVec> & resultsCo
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -1368,7 +1378,7 @@ bool HybridSystem::reach_continuous_high_degree(list<TaylorModelVec> & resultsCo
 				printf("order = %d\n", order);
 			}
 
-			double newStep = step_exp_table[1].sup() / LAMBDA;
+			newStep = step_exp_table[1].sup() * LAMBDA_UP;
 			if(newStep > step - THRESHOLD_HIGH)
 			{
 				newStep = 0;
@@ -1376,7 +1386,7 @@ bool HybridSystem::reach_continuous_high_degree(list<TaylorModelVec> & resultsCo
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -1482,7 +1492,7 @@ bool HybridSystem::reach_continuous_high_degree(list<TaylorModelVec> & resultsCo
 				printf("%s : %d\n", stateVarNames[num].c_str(), orders[num]);
 			}
 
-			double newStep = step_exp_table[1].sup() / LAMBDA;
+			newStep = step_exp_table[1].sup() * LAMBDA_UP;
 			if(newStep > step - THRESHOLD_HIGH)
 			{
 				newStep = 0;
@@ -1490,7 +1500,7 @@ bool HybridSystem::reach_continuous_high_degree(list<TaylorModelVec> & resultsCo
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -1598,7 +1608,7 @@ bool HybridSystem::reach_continuous_high_degree(list<TaylorModelVec> & resultsCo
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -1719,7 +1729,7 @@ bool HybridSystem::reach_continuous_high_degree(list<TaylorModelVec> & resultsCo
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -1728,9 +1738,9 @@ bool HybridSystem::reach_continuous_high_degree(list<TaylorModelVec> & resultsCo
 }
 
 
-// for non-polynomial ODEs
+// for non-polynomial ODEs (using Taylor approximations)
 // fixed step sizes and orders
-bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
+bool HybridSystem::reach_continuous_non_polynomial_taylor(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
 		const double step, const double time, const int order, const int precondition, const vector<Interval> & estimation, const bool bPrint,
 		const vector<string> & stateVarNames, vector<bool> & invariant_boundary_intersected, const vector<string> & modeNames) const
 {
@@ -1750,7 +1760,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 
 	for(double t=THRESHOLD_HIGH; t < time;)
 	{
-		bool bvalid = currentFlowpipe.advance_non_polynomial(newFlowpipe, strOdes[mode], precondition, step_exp_table, step_end_exp_table, order, estimation, uncertainties[mode], uncertainty_centers[mode]);
+		bool bvalid = currentFlowpipe.advance_non_polynomial_taylor(newFlowpipe, strOdes[mode], precondition, step_exp_table, step_end_exp_table, order, estimation, uncertainties[mode], uncertainty_centers[mode]);
 
 		if(bvalid)
 		{
@@ -1821,7 +1831,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -1829,7 +1839,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 	return true;
 }
 
-bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
+bool HybridSystem::reach_continuous_non_polynomial_taylor(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
 		const double step, const double time, const vector<int> & orders, const int globalMaxOrder, const int precondition,
 		const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames,
 		vector<bool> & invariant_boundary_intersected, const vector<string> & modeNames) const
@@ -1850,7 +1860,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 
 	for(double t=THRESHOLD_HIGH; t < time;)
 	{
-		bool bvalid = currentFlowpipe.advance_non_polynomial(newFlowpipe, strOdes[mode], precondition, step_exp_table, step_end_exp_table, orders, globalMaxOrder, estimation, uncertainties[mode], uncertainty_centers[mode]);
+		bool bvalid = currentFlowpipe.advance_non_polynomial_taylor(newFlowpipe, strOdes[mode], precondition, step_exp_table, step_end_exp_table, orders, globalMaxOrder, estimation, uncertainties[mode], uncertainty_centers[mode]);
 
 		if(bvalid)
 		{
@@ -1927,7 +1937,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -1937,7 +1947,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 
 
 // adaptive step sizes and fixed orders
-bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
+bool HybridSystem::reach_continuous_non_polynomial_taylor(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
 		const double step, const double miniStep, const double time, const int order, const int precondition,
 		const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames,
 		vector<bool> & invariant_boundary_intersected, const vector<string> & modeNames) const
@@ -1960,7 +1970,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 
 	for(double t=THRESHOLD_HIGH; t < time;)
 	{
-		bool bvalid = currentFlowpipe.advance_non_polynomial(newFlowpipe, strOdes[mode], precondition, step_exp_table, step_end_exp_table, newStep, miniStep, order, estimation, uncertainties[mode], uncertainty_centers[mode]);
+		bool bvalid = currentFlowpipe.advance_non_polynomial_taylor(newFlowpipe, strOdes[mode], precondition, step_exp_table, step_end_exp_table, newStep, miniStep, order, estimation, uncertainties[mode], uncertainty_centers[mode]);
 
 		if(bvalid)
 		{
@@ -2029,7 +2039,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 				printf("order = %d\n", order);
 			}
 
-			double newStep = step_exp_table[1].sup() / LAMBDA;
+			newStep = step_exp_table[1].sup() * LAMBDA_UP;
 			if(newStep > step - THRESHOLD_HIGH)
 			{
 				newStep = 0;
@@ -2037,7 +2047,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -2045,7 +2055,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 	return true;
 }
 
-bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
+bool HybridSystem::reach_continuous_non_polynomial_taylor(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
 		const double step, const double miniStep, const double time, const vector<int> & orders, const int globalMaxOrder,
 		const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames,
 		vector<bool> & invariant_boundary_intersected, const vector<string> & modeNames) const
@@ -2068,7 +2078,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 
 	for(double t=THRESHOLD_HIGH; t < time;)
 	{
-		bool bvalid = currentFlowpipe.advance_non_polynomial(newFlowpipe, strOdes[mode], precondition, step_exp_table, step_end_exp_table, newStep, miniStep, orders, globalMaxOrder, estimation, uncertainties[mode], uncertainty_centers[mode]);
+		bool bvalid = currentFlowpipe.advance_non_polynomial_taylor(newFlowpipe, strOdes[mode], precondition, step_exp_table, step_end_exp_table, newStep, miniStep, orders, globalMaxOrder, estimation, uncertainties[mode], uncertainty_centers[mode]);
 
 		if(bvalid)
 		{
@@ -2143,7 +2153,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 				printf("%s : %d\n", stateVarNames[num].c_str(), orders[num]);
 			}
 
-			double newStep = step_exp_table[1].sup() / LAMBDA;
+			newStep = step_exp_table[1].sup() * LAMBDA_UP;
 			if(newStep > step - THRESHOLD_HIGH)
 			{
 				newStep = 0;
@@ -2151,7 +2161,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -2161,7 +2171,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 
 
 // adaptive orders and fixed step sizes
-bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
+bool HybridSystem::reach_continuous_non_polynomial_taylor(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
 		const double step, const double time, const int order, const int maxOrder, const int precondition, const vector<Interval> & estimation,
 		const bool bPrint, const vector<string> & stateVarNames, vector<bool> & invariant_boundary_intersected,
 		const vector<string> & modeNames) const
@@ -2184,7 +2194,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 
 	for(double t=THRESHOLD_HIGH; t < time;)
 	{
-		bool bvalid = currentFlowpipe.advance_non_polynomial(newFlowpipe, strOdes[mode], precondition, step_exp_table, step_end_exp_table, newOrder, maxOrder, estimation, uncertainties[mode], uncertainty_centers[mode]);
+		bool bvalid = currentFlowpipe.advance_non_polynomial_taylor(newFlowpipe, strOdes[mode], precondition, step_exp_table, step_end_exp_table, newOrder, maxOrder, estimation, uncertainties[mode], uncertainty_centers[mode]);
 
 		if(bvalid)
 		{
@@ -2260,7 +2270,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -2268,7 +2278,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 	return true;
 }
 
-bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
+bool HybridSystem::reach_continuous_non_polynomial_taylor(list<TaylorModelVec> & resultsCompo, list<vector<Interval> > & domains, const int mode, const Flowpipe & initFp,
 		const double step, const double time, const vector<int> & orders, const vector<int> & maxOrders, const int globalMaxOrder,
 		const int precondition, const vector<Interval> & estimation, const bool bPrint, const vector<string> & stateVarNames,
 		vector<bool> & invariant_boundary_intersected, const vector<string> & modeNames) const
@@ -2298,7 +2308,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 				localMaxOrder = newOrders[i];
 		}
 
-		bool bvalid = currentFlowpipe.advance_non_polynomial(newFlowpipe, strOdes[mode], precondition, step_exp_table, step_end_exp_table, newOrders, localMaxOrder, maxOrders, estimation, uncertainties[mode], uncertainty_centers[mode]);
+		bool bvalid = currentFlowpipe.advance_non_polynomial_taylor(newFlowpipe, strOdes[mode], precondition, step_exp_table, step_end_exp_table, newOrders, localMaxOrder, maxOrders, estimation, uncertainties[mode], uncertainty_centers[mode]);
 
 		if(bvalid)
 		{
@@ -2381,7 +2391,7 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 		}
 		else
 		{
-			fprintf(stdout, "Flow* stops -- The remainder estimation is not large enough.\n");
+			fprintf(stdout, "Terminated -- The remainder estimation is not large enough.\n");
 			return false;
 		}
 	}
@@ -2390,21 +2400,10 @@ bool HybridSystem::reach_continuous_non_polynomial(list<TaylorModelVec> & result
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
 // hybrid reachability
 
 void HybridSystem::reach_hybrid(list<list<TaylorModelVec> > & resultsCompo, list<list<vector<Interval> > > & domains, list<int> & modeIDs, list<TreeNode *> & traceNodes,
-		ComputationTree & traceTree, const vector<int> & integrationSchemes, const double step, const double miniStep,
+		TreeNode * & traceTree, const vector<int> & integrationSchemes, const double step, const double miniStep,
 		const double time, const int orderType, const vector<int> & orders, const vector<int> & maxOrders, const int globalMaxOrder,
 		const bool bAdaptiveSteps, const bool bAdaptiveOrders, const int maxJmps, const int precondition, const vector<Interval> & estimation,
 		const vector<vector<int> > & aggregType, const vector<vector<vector<RowVector> > > aggregationTemplate_candidates, const vector<RowVector> default_aggregation_template,
@@ -2416,6 +2415,7 @@ void HybridSystem::reach_hybrid(list<list<TaylorModelVec> > & resultsCompo, list
 	list<double> timePassedQueue;
 	list<int> jumpsExecutedQueue;
 
+	Interval intZero;
 	int rangeDim = initialSet.tmv.tms.size();
 
 	modeQueue.push_back(initialMode);
@@ -2425,9 +2425,8 @@ void HybridSystem::reach_hybrid(list<list<TaylorModelVec> > & resultsCompo, list
 
 	// mode trace
 	list<TreeNode *> nodeQueue;
-	TreeNode *root = new TreeNode(initialMode);
-	traceTree.root = root;
-	nodeQueue.push_back(root);
+	traceTree = new TreeNode(0, initialMode, intZero);
+	nodeQueue.push_back(traceTree);
 
 	for(; modeQueue.size() != 0;)
 	{
@@ -2523,40 +2522,39 @@ void HybridSystem::reach_hybrid(list<list<TaylorModelVec> > & resultsCompo, list
 			break;
 		}
 
-		case NON_POLY:
+		case NONPOLY_TAYLOR:
 		{
 			switch(orderType)
 			{
 			case UNIFORM:
 				if(bAdaptiveSteps)
 				{
-					bvalid = reach_continuous_non_polynomial(mode_flowpipes, mode_domains, initMode, initFp, step, miniStep, time-timePassed, orders[0], precondition, estimation, bPrint, stateVarNames, invariant_boundary_intersected, modeNames);
+					bvalid = reach_continuous_non_polynomial_taylor(mode_flowpipes, mode_domains, initMode, initFp, step, miniStep, time-timePassed, orders[0], precondition, estimation, bPrint, stateVarNames, invariant_boundary_intersected, modeNames);
 				}
 				else if(bAdaptiveOrders)
 				{
-					bvalid = reach_continuous_non_polynomial(mode_flowpipes, mode_domains, initMode, initFp, step, time-timePassed, orders[0], maxOrders[0], precondition, estimation, bPrint, stateVarNames, invariant_boundary_intersected, modeNames);
+					bvalid = reach_continuous_non_polynomial_taylor(mode_flowpipes, mode_domains, initMode, initFp, step, time-timePassed, orders[0], maxOrders[0], precondition, estimation, bPrint, stateVarNames, invariant_boundary_intersected, modeNames);
 				}
 				else
 				{
-					bvalid = reach_continuous_non_polynomial(mode_flowpipes, mode_domains, initMode, initFp, step, time-timePassed, orders[0], precondition, estimation, bPrint, stateVarNames, invariant_boundary_intersected, modeNames);
+					bvalid = reach_continuous_non_polynomial_taylor(mode_flowpipes, mode_domains, initMode, initFp, step, time-timePassed, orders[0], precondition, estimation, bPrint, stateVarNames, invariant_boundary_intersected, modeNames);
 				}
 				break;
 			case MULTI:
 				if(bAdaptiveSteps)
 				{
-					bvalid = reach_continuous_non_polynomial(mode_flowpipes, mode_domains, initMode, initFp, step, miniStep, time-timePassed, orders, globalMaxOrder, precondition, estimation, bPrint, stateVarNames, invariant_boundary_intersected, modeNames);
+					bvalid = reach_continuous_non_polynomial_taylor(mode_flowpipes, mode_domains, initMode, initFp, step, miniStep, time-timePassed, orders, globalMaxOrder, precondition, estimation, bPrint, stateVarNames, invariant_boundary_intersected, modeNames);
 				}
 				else if(bAdaptiveOrders)
 				{
-					bvalid = reach_continuous_non_polynomial(mode_flowpipes, mode_domains, initMode, initFp, step, time-timePassed, orders, maxOrders, globalMaxOrder, precondition, estimation, bPrint, stateVarNames, invariant_boundary_intersected, modeNames);
+					bvalid = reach_continuous_non_polynomial_taylor(mode_flowpipes, mode_domains, initMode, initFp, step, time-timePassed, orders, maxOrders, globalMaxOrder, precondition, estimation, bPrint, stateVarNames, invariant_boundary_intersected, modeNames);
 				}
 				else
 				{
-					bvalid = reach_continuous_non_polynomial(mode_flowpipes, mode_domains, initMode, initFp, step, time-timePassed, orders, globalMaxOrder, precondition, estimation, bPrint, stateVarNames, invariant_boundary_intersected, modeNames);
+					bvalid = reach_continuous_non_polynomial_taylor(mode_flowpipes, mode_domains, initMode, initFp, step, time-timePassed, orders, globalMaxOrder, precondition, estimation, bPrint, stateVarNames, invariant_boundary_intersected, modeNames);
 				}
 				break;
 			}
-			break;
 			break;
 		}
 		}
@@ -2618,6 +2616,8 @@ void HybridSystem::reach_hybrid(list<list<TaylorModelVec> > & resultsCompo, list
 
 			step_exp_table = step_exp_tables[0];
 
+			Interval triggeredTime;
+
 			for(int k=0; tmvIter!=mode_flowpipes.end(); ++tmvIter, ++doIter)
 			{
 				TaylorModelVec tmvIntersection = *tmvIter;
@@ -2655,7 +2655,15 @@ void HybridSystem::reach_hybrid(list<list<TaylorModelVec> > & resultsCompo, list
 					if(!brecorded)
 					{
 						brecorded = true;
+
+						triggeredTime = doIntersection[0];
+						triggeredTime.add_assign(newTimePassed);
 						newTimePassed += doIntersection[0].inf();
+					}
+					else
+					{
+						// compute the time interval when the jump is triggered
+						triggeredTime.setSup(triggeredTime.sup() + doIntersection[0].sup());
 					}
 
 					intersection_flowpipes.push_back(tmvIntersection);
@@ -2750,8 +2758,9 @@ void HybridSystem::reach_hybrid(list<list<TaylorModelVec> > & resultsCompo, list
 					timePassedQueue.push_back(timePassed);
 					jumpsExecutedQueue.push_back(jumpsExecuted+1);
 
-					TreeNode *child = new TreeNode(transitions[initMode][i].targetID);
+					TreeNode *child = new TreeNode(transitions[initMode][i].jumpID, transitions[initMode][i].targetID, triggeredTime);
 					child->parent = node;
+					node->children.push_back(child);
 
 					nodeQueue.push_back(child);
 				}
@@ -2793,6 +2802,8 @@ void HybridSystem::reach_hybrid(list<list<TaylorModelVec> > & resultsCompo, list
 
 HybridReachability::HybridReachability()
 {
+	traceTree = NULL;
+	numOfJumps = 0;
 }
 
 HybridReachability::~HybridReachability()
@@ -2817,6 +2828,8 @@ HybridReachability::~HybridReachability()
 	unsafeSet.clear();
 	traceNodes.clear();
 	integrationSchemes.clear();
+
+	delete traceTree;
 }
 
 void HybridReachability::dump(FILE *fp) const
@@ -2841,16 +2854,43 @@ void HybridReachability::dump(FILE *fp) const
 		fprintf(fp, "}\n\n");
 	}
 
-	switch(plotSetting)
+	// dump the computation tree
+	fprintf(fp, "computation paths\n{\n\n");
+
+	string strEmpty;
+	traceTree->dump(fp, strEmpty, modeNames);
+
+	fprintf(fp, "}\n\n");
+
+	switch(plotFormat)
 	{
-	case PLOT_INTERVAL:
-		fprintf(fp, "visualize interval %s , %s\n\n", stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+	case PLOT_GNUPLOT:
+		switch(plotSetting)
+		{
+		case PLOT_INTERVAL:
+			fprintf(fp, "gnuplot interval %s , %s\n\n", stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+			break;
+		case PLOT_OCTAGON:
+			fprintf(fp, "gnuplot octagon %s , %s\n\n", stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+			break;
+		case PLOT_GRID:
+			fprintf(fp, "gnuplot grid %d %s , %s\n\n", numSections, stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+			break;
+		}
 		break;
-	case PLOT_OCTAGON:
-		fprintf(fp, "visualize octagon %s , %s\n\n", stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
-		break;
-	case PLOT_GRID:
-		fprintf(fp, "visualize grid %d %s , %s\n\n", numSections, stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+	case PLOT_MATLAB:
+		switch(plotSetting)
+		{
+		case PLOT_INTERVAL:
+			fprintf(fp, "matlab interval %s , %s\n\n", stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+			break;
+		case PLOT_OCTAGON:
+			fprintf(fp, "matlab octagon %s , %s\n\n", stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+			break;
+		case PLOT_GRID:
+			fprintf(fp, "matlab grid %d %s , %s\n\n", numSections, stateVarNames[outputAxes[0]].c_str(), stateVarNames[outputAxes[1]].c_str());
+			break;
+		}
 		break;
 	}
 
@@ -2936,6 +2976,7 @@ void HybridReachability::dump(FILE *fp) const
 				(*doIter)[i].dump(fp);
 				fprintf(fp, "\n");
 			}
+
 			fprintf(fp, "}\n\n");
 		}
 
@@ -3005,29 +3046,70 @@ void HybridReachability::run()
 	// ==== test end ====
 */
 
+	compute_factorial_rec(globalMaxOrder+1);
+	compute_power_4(globalMaxOrder+1);
+	compute_double_factorial(2*globalMaxOrder);
+
 
 	system.reach_hybrid(flowpipesCompo, domains, modeIDs, traceNodes, traceTree, integrationSchemes, step, miniStep, time, orderType, orders, maxOrders, globalMaxOrder, bAdaptiveSteps, bAdaptiveOrders,
 			maxJumps, precondition, estimation, aggregationType, aggregationTemplate_candidates, default_aggregation_template, weightTab,
 			linear_auto, template_auto, bPrint, stateVarNames, modeNames, tmVarNames);
 }
 
-void HybridReachability::output_2D_GNUPLOT(FILE *fp) const
+void HybridReachability::plot_2D() const
+{
+	char filename[NAME_SIZE+10];
+
+	switch(plotFormat)
+	{
+	case PLOT_GNUPLOT:
+		sprintf(filename, "%s%s.plt", outputDir, outputFileName);
+		break;
+	case PLOT_MATLAB:
+		sprintf(filename, "%s%s.m", outputDir, outputFileName);
+		break;
+	}
+
+	FILE *fpPlotting = fopen(filename, "w");
+
+	if(fpPlotting == NULL)
+	{
+		printf("Can not create the plotting file.\n");
+		exit(1);
+	}
+
+	printf("Generating the plotting file...\n");
+	switch(plotFormat)
+	{
+	case PLOT_GNUPLOT:
+		plot_2D_GNUPLOT(fpPlotting);
+		break;
+	case PLOT_MATLAB:
+		plot_2D_MATLAB(fpPlotting);
+		break;
+	}
+	printf("Done.\n");
+
+	fclose(fpPlotting);
+}
+
+void HybridReachability::plot_2D_GNUPLOT(FILE *fp) const
 {
 	switch(plotSetting)
 	{
 	case PLOT_INTERVAL:
-		output_2D_interval_GNUPLOT(fp);
+		plot_2D_interval_GNUPLOT(fp);
 		break;
 	case PLOT_OCTAGON:
-		output_2D_octagon_GNUPLOT(fp);
+		plot_2D_octagon_GNUPLOT(fp);
 		break;
 	case PLOT_GRID:
-		output_2D_grid_GNUPLOT(fp);
+		plot_2D_grid_GNUPLOT(fp);
 		break;
 	}
 }
 
-void HybridReachability::output_2D_interval_GNUPLOT(FILE *fp) const
+void HybridReachability::plot_2D_interval_GNUPLOT(FILE *fp) const
 {
 	fprintf(fp, "set terminal postscript\n");
 
@@ -3050,11 +3132,6 @@ void HybridReachability::output_2D_interval_GNUPLOT(FILE *fp) const
 
 	list<TaylorModelVec>::const_iterator tmvIter;
 	list<vector<Interval> >::const_iterator doIter;
-
-	vector<Interval> step_exp_table;
-
-	Interval I(1);
-	step_exp_table.push_back(I);
 
 	for(; fpIter!=flowpipesCompo.end(); ++fpIter, ++fpdoIter, ++modeIter)
 	{
@@ -3081,7 +3158,7 @@ void HybridReachability::output_2D_interval_GNUPLOT(FILE *fp) const
 
 			Interval X(box[outputAxes[0]]), Y(box[outputAxes[1]]);
 
-			// output all the vertices
+			// output the vertices
 			fprintf(fp, "%lf %lf\n", X.inf(), Y.inf());
 			fprintf(fp, "%lf %lf\n", X.sup(), Y.inf());
 			fprintf(fp, "%lf %lf\n", X.sup(), Y.sup());
@@ -3094,7 +3171,7 @@ void HybridReachability::output_2D_interval_GNUPLOT(FILE *fp) const
 	fprintf(fp, "e\n");
 }
 
-void HybridReachability::output_2D_octagon_GNUPLOT(FILE *fp) const
+void HybridReachability::plot_2D_octagon_GNUPLOT(FILE *fp) const
 {
 	int x = outputAxes[0];
 	int y = outputAxes[1];
@@ -3374,7 +3451,7 @@ void HybridReachability::output_2D_octagon_GNUPLOT(FILE *fp) const
 	fprintf(fp, "e\n");
 }
 
-void HybridReachability::output_2D_grid_GNUPLOT(FILE *fp) const
+void HybridReachability::plot_2D_grid_GNUPLOT(FILE *fp) const
 {
 	fprintf(fp, "set terminal postscript\n");
 
@@ -3412,29 +3489,8 @@ void HybridReachability::output_2D_grid_GNUPLOT(FILE *fp) const
 		{
 			// decompose the domain
 			list<vector<Interval> > grids;
-			grids.push_back(*doIter);
 
-			for(int i=0; i<domainDim; ++i)
-			{
-				list<vector<Interval> > newGrids;
-
-				for(; grids.size() != 0;)
-				{
-					vector<Interval> grid = grids.front();
-					grids.pop_front();
-					double width = grid[i].width();
-
-					for(int j=1; j<=numSections; ++j)
-					{
-						Interval I( grid[i].inf()+width*(double)(j-1)/(double)numSections , grid[i].inf()+width*(double)j/(double)numSections);
-						vector<Interval> newGrid = grid;
-						newGrid[i] = I;
-						newGrids.push_back(newGrid);
-					}
-				}
-
-				grids = newGrids;
-			}
+			gridBox(grids, *doIter, numSections);
 
 			// Transform the Taylor model into a Horner form
 			vector<HornerForm> tmvHF;
@@ -3491,6 +3547,429 @@ void HybridReachability::output_2D_grid_GNUPLOT(FILE *fp) const
 	}
 
 	fprintf(fp, "e\n");
+}
+
+void HybridReachability::plot_2D_MATLAB(FILE *fp) const
+{
+	switch(plotSetting)
+	{
+	case PLOT_INTERVAL:
+		plot_2D_interval_MATLAB(fp);
+		break;
+	case PLOT_OCTAGON:
+		plot_2D_octagon_MATLAB(fp);
+		break;
+	case PLOT_GRID:
+		plot_2D_grid_MATLAB(fp);
+		break;
+	}
+}
+
+void HybridReachability::plot_2D_interval_MATLAB(FILE *fp) const
+{
+	list<list<TaylorModelVec> >::const_iterator fpIter = flowpipesCompo.begin();
+	list<list<vector<Interval> > >::const_iterator fpdoIter = domains.begin();
+	list<int>::const_iterator modeIter = modeIDs.begin();
+
+	list<TaylorModelVec>::const_iterator tmvIter;
+	list<vector<Interval> >::const_iterator doIter;
+
+	for(; fpIter!=flowpipesCompo.end(); ++fpIter, ++fpdoIter, ++modeIter)
+	{
+		tmvIter = fpIter->begin();
+		doIter = fpdoIter->begin();
+
+		for(; tmvIter != fpIter->end(); ++tmvIter, ++doIter)
+		{
+			vector<Interval> box;
+			tmvIter->intEval(box, *doIter);
+
+			// contract the interval according to the invariant
+			vector<Interval> new_domain;
+			vector<bool> bVecTemp;
+			TaylorModelVec tmvInterval(box, new_domain);
+			int type = contract_interval_arithmetic(tmvInterval, new_domain, system.invariants[*modeIter], bVecTemp);
+
+			if(type < 0)
+			{
+				continue;
+			}
+
+			tmvInterval.intEval(box, new_domain);
+
+			Interval X(box[outputAxes[0]]), Y(box[outputAxes[1]]);
+
+			// output the vertices
+			fprintf(fp,"plot( [%lf,%lf,%lf,%lf,%lf] , [%lf,%lf,%lf,%lf,%lf] , 'b');\nhold on;\nclear;\n",
+					X.inf(), X.sup(), X.sup(), X.inf(), X.inf(), Y.inf(), Y.inf(), Y.sup(), Y.sup(), Y.inf());
+		}
+	}
+}
+
+void HybridReachability::plot_2D_octagon_MATLAB(FILE *fp) const
+{
+	int x = outputAxes[0];
+	int y = outputAxes[1];
+
+	Interval intZero;
+
+	int rangeDim = stateVarNames.size();
+	Matrix output_poly_temp(8, rangeDim);
+
+	output_poly_temp.set(1, 0, x);
+	output_poly_temp.set(1, 1, y);
+	output_poly_temp.set(-1, 2, x);
+	output_poly_temp.set(-1, 3, y);
+	output_poly_temp.set(1/sqrt(2), 4, x);
+	output_poly_temp.set(1/sqrt(2), 4, y);
+	output_poly_temp.set(1/sqrt(2), 5, x);
+	output_poly_temp.set(-1/sqrt(2), 5, y);
+	output_poly_temp.set(-1/sqrt(2), 6, x);
+	output_poly_temp.set(1/sqrt(2), 6, y);
+	output_poly_temp.set(-1/sqrt(2), 7, x);
+	output_poly_temp.set(-1/sqrt(2), 7, y);
+
+	// Construct the 2D template matrix.
+	int rows = 8;
+	int cols = rangeDim;
+
+	Matrix sortedTemplate(rows, cols);
+	RowVector rowVec(cols);
+	list<RowVector> sortedRows;
+	list<RowVector>::iterator iterp, iterq;
+
+	output_poly_temp.row(rowVec, 0);
+	sortedRows.push_back(rowVec);
+
+	bool bInserted;
+
+	// Sort the row vectors in the template by anti-clockwise order (only in the x-y space).
+	for(int i=1; i<rows; ++i)
+	{
+		iterp = sortedRows.begin();
+		iterq = iterp;
+		++iterq;
+		bInserted = false;
+
+		for(; iterq != sortedRows.end();)
+		{
+			double tmp1 = output_poly_temp.get(i,x) * iterp->get(y) - output_poly_temp.get(i,y) * iterp->get(x);
+			double tmp2 = output_poly_temp.get(i,x) * iterq->get(y) - output_poly_temp.get(i,y) * iterq->get(x);
+
+			if(tmp1 < 0 && tmp2 > 0)
+			{
+				output_poly_temp.row(rowVec, i);
+				sortedRows.insert(iterq, rowVec);
+				bInserted = true;
+				break;
+			}
+			else
+			{
+				++iterp;
+				++iterq;
+			}
+		}
+
+		if(!bInserted)
+		{
+			output_poly_temp.row(rowVec, i);
+			sortedRows.push_back(rowVec);
+		}
+	}
+
+	iterp = sortedRows.begin();
+	for(int i=0; i<rows; ++i, ++iterp)
+	{
+		for(int j=0; j<cols; ++j)
+		{
+			sortedTemplate.set(iterp->get(j), i, j);
+		}
+	}
+
+	ColVector b(rows);
+
+	vector<Interval> step_exp_table;
+	Interval I(1);
+	step_exp_table.push_back(I);
+
+	// Compute the intersections of two facets.
+	// The vertices are ordered clockwisely.
+
+	gsl_matrix *C = gsl_matrix_alloc(2,2);
+	gsl_vector *d = gsl_vector_alloc(2);
+	gsl_vector *vertex = gsl_vector_alloc(2);
+
+	list<list<TaylorModelVec> >::const_iterator fpIter = flowpipesCompo.begin();
+	list<list<vector<Interval> > >::const_iterator fpdoIter = domains.begin();
+	list<int>::const_iterator modeIter = modeIDs.begin();
+
+	list<TaylorModelVec>::const_iterator tmvIter;
+	list<vector<Interval> >::const_iterator doIter;
+
+	for(; fpIter!=flowpipesCompo.end(); ++fpIter, ++fpdoIter, ++modeIter)
+	{
+		tmvIter = fpIter->begin();
+		doIter = fpdoIter->begin();
+
+		for(; tmvIter != fpIter->end(); ++tmvIter, ++doIter)
+		{
+			int rangeDim = tmvIter->tms.size();
+			vector<Interval> box;
+			tmvIter->intEval(box, *doIter);
+
+			vector<Interval> new_domain;
+			vector<bool> bVecTemp;
+			TaylorModelVec tmvInterval(box, new_domain);
+			int type = contract_interval_arithmetic(tmvInterval, new_domain, system.invariants[*modeIter], bVecTemp);
+
+			if(type < 0)
+			{
+				continue;
+			}
+
+			tmvInterval.intEval(box, new_domain);
+
+			// the box template
+			b.set(box[x].sup(), 0);
+			b.set(box[y].sup(), 2);
+			b.set(-box[x].inf(), 4);
+			b.set(-box[y].inf(), 6);
+
+			// consider the other vectors
+			Matrix other_vectors(rangeDim, rangeDim+1);
+			for(int i=0; i<rangeDim; ++i)
+			{
+				if(i != x && i != y)
+				{
+					other_vectors.set(1, i, i+1);
+				}
+			}
+
+			other_vectors.set(1/sqrt(2), x, x+1);
+			other_vectors.set(1/sqrt(2), x, y+1);
+			other_vectors.set(1/sqrt(2), y, x+1);
+			other_vectors.set(-1/sqrt(2), y, y+1);
+
+			TaylorModelVec tmv_other_vectors(other_vectors);
+
+			for(int i=0; i<rangeDim; ++i)
+			{
+
+				RowVector rowVecTemp(rangeDim);
+
+				for(int j=0; j<rangeDim; ++j)
+				{
+					rowVecTemp.set(other_vectors.get(i,j+1), j);
+				}
+
+				Interval intTemp = rho(*tmvIter, rowVecTemp, *doIter);
+				new_domain[i+1].setSup(intTemp);
+
+				rowVecTemp.neg_assign();
+
+				intTemp = rho(*tmvIter, rowVecTemp, *doIter);
+				intTemp.inv_assign();
+				new_domain[i+1].setInf(intTemp);
+			}
+
+			type = contract_interval_arithmetic(tmv_other_vectors, new_domain, system.invariants[*modeIter], bVecTemp);
+
+			if(type < 0)
+			{
+				continue;
+			}
+
+
+			RowVector template_vector_1(rangeDim);
+			template_vector_1.set(1/sqrt(2), x);
+			template_vector_1.set(1/sqrt(2), y);
+
+			double sp = (rho(tmv_other_vectors, template_vector_1, new_domain)).sup();
+			double sp2 = (1/sqrt(2))*b.get(0) + (1/sqrt(2))*b.get(2);
+			b.set(sp, 1);
+
+
+			RowVector template_vector_3(rangeDim);
+			template_vector_3.set(-1/sqrt(2), x);
+			template_vector_3.set(1/sqrt(2), y);
+
+			sp = (rho(tmv_other_vectors, template_vector_3, new_domain)).sup();
+			b.set(sp, 3);
+
+
+			RowVector template_vector_5(rangeDim);
+			template_vector_5.set(-1/sqrt(2), x);
+			template_vector_5.set(-1/sqrt(2), y);
+
+			sp = (rho(tmv_other_vectors, template_vector_5, new_domain)).sup();
+			b.set(sp, 5);
+
+
+			RowVector template_vector_7(rangeDim);
+			template_vector_7.set(1/sqrt(2), x);
+			template_vector_7.set(-1/sqrt(2), y);
+
+			sp = (rho(tmv_other_vectors, template_vector_7, new_domain)).sup();
+			b.set(sp, 7);
+
+			Polyhedron polyTemplate(sortedTemplate, b);
+			polyTemplate.tightenConstraints();
+
+			double f1, f2;
+
+			list<LinearConstraint>::iterator iterp, iterq;
+			iterp = iterq = polyTemplate.constraints.begin();
+			++iterq;
+
+			vector<double> vertices_x, vertices_y;
+
+			for(; iterq != polyTemplate.constraints.end(); ++iterp, ++iterq)
+			{
+				gsl_matrix_set(C, 0, 0, iterp->A[x].midpoint());
+				gsl_matrix_set(C, 0, 1, iterp->A[y].midpoint());
+				gsl_matrix_set(C, 1, 0, iterq->A[x].midpoint());
+				gsl_matrix_set(C, 1, 1, iterq->A[y].midpoint());
+
+				gsl_vector_set(d, 0, iterp->B.midpoint());
+				gsl_vector_set(d, 1, iterq->B.midpoint());
+
+				gsl_linalg_HH_solve(C, d, vertex);
+
+				double v1 = gsl_vector_get(vertex, 0);
+				double v2 = gsl_vector_get(vertex, 1);
+
+				if(iterp == polyTemplate.constraints.begin())
+				{
+					f1 = v1;
+					f2 = v2;
+				}
+
+				vertices_x.push_back(v1);
+				vertices_y.push_back(v2);
+//				fprintf(fp, "%lf %lf\n", v1, v2);
+			}
+
+			iterp = polyTemplate.constraints.begin();
+			--iterq;
+
+			gsl_matrix_set(C, 0, 0, iterp->A[x].midpoint());
+			gsl_matrix_set(C, 0, 1, iterp->A[y].midpoint());
+			gsl_matrix_set(C, 1, 0, iterq->A[x].midpoint());
+			gsl_matrix_set(C, 1, 1, iterq->A[y].midpoint());
+
+			gsl_vector_set(d, 0, iterp->B.midpoint());
+			gsl_vector_set(d, 1, iterq->B.midpoint());
+
+			gsl_linalg_HH_solve(C, d, vertex);
+
+			double v1 = gsl_vector_get(vertex, 0);
+			double v2 = gsl_vector_get(vertex, 1);
+
+			vertices_x.push_back(v1);
+			vertices_y.push_back(v2);
+			vertices_x.push_back(f1);
+			vertices_y.push_back(f2);
+
+			fprintf(fp, "plot( ");
+
+			fprintf(fp, "[ ");
+			for(int i=0; i<vertices_x.size()-1; ++i)
+			{
+				fprintf(fp, "%lf , ", vertices_x[i]);
+			}
+			fprintf(fp, "%lf ] , ", vertices_x.back());
+
+			fprintf(fp, "[ ");
+			for(int i=0; i<vertices_y.size()-1; ++i)
+			{
+				fprintf(fp, "%lf , ", vertices_y[i]);
+			}
+			fprintf(fp, "%lf ] , ", vertices_y.back());
+
+			fprintf(fp, "'b');\nhold on;\nclear;\n");
+
+//			fprintf(fp, "%lf %lf\n", v1, v2);
+//			fprintf(fp, "%lf %lf\n", f1, f2);
+//			fprintf(fp, "\n\n");
+		}
+	}
+}
+
+void HybridReachability::plot_2D_grid_MATLAB(FILE *fp) const
+{
+	list<list<TaylorModelVec> >::const_iterator fpIter = flowpipesCompo.begin();
+	list<list<vector<Interval> > >::const_iterator fpdoIter = domains.begin();
+	list<int>::const_iterator modeIter = modeIDs.begin();
+
+	list<TaylorModelVec>::const_iterator tmvIter;
+	list<vector<Interval> >::const_iterator doIter;
+
+	vector<Interval> step_exp_table;
+	Interval I(1);
+	step_exp_table.push_back(I);
+
+	for(; fpIter!=flowpipesCompo.end(); ++fpIter, ++fpdoIter, ++modeIter)
+	{
+		tmvIter = fpIter->begin();
+		doIter = fpdoIter->begin();
+		int domainDim = doIter->size();
+
+		for(; tmvIter != fpIter->end(); ++tmvIter, ++doIter)
+		{
+			// decompose the domain
+			list<vector<Interval> > grids;
+
+			gridBox(grids, *doIter, numSections);
+
+			// Transform the Taylor model into a Horner form
+			vector<HornerForm> tmvHF;
+			vector<Interval> remainders;
+			int rangeDim = tmvIter->tms.size();
+
+			for(int i=0; i<rangeDim; ++i)
+			{
+				HornerForm hfTemp;
+				Interval intTemp;
+				tmvIter->tms[i].toHornerForm(hfTemp, intTemp);
+				tmvHF.push_back(hfTemp);
+				remainders.push_back(intTemp);
+			}
+
+			// evaluate the images from all of the grids
+			list<vector<Interval> >::const_iterator gIter = grids.begin();
+			for(; gIter!=grids.end(); ++gIter)
+			{
+				vector<Interval> box;
+
+				for(int i=0; i<rangeDim; ++i)
+				{
+					Interval intTemp;
+					tmvHF[i].intEval(intTemp, *gIter);
+					intTemp += remainders[i];
+					box.push_back(intTemp);
+				}
+
+				// contract the interval according to the invariant
+				vector<Interval> new_domain;
+				vector<bool> bVecTemp;
+				TaylorModelVec tmvInterval(box, new_domain);
+				int type = contract_interval_arithmetic(tmvInterval, new_domain, system.invariants[*modeIter], bVecTemp);
+
+				if(type < 0)
+				{
+					continue;
+				}
+
+				tmvInterval.intEval(box, new_domain);
+
+				Interval X(box[outputAxes[0]]), Y(box[outputAxes[1]]);
+
+				// output the vertices
+				fprintf(fp,"plot( [%lf,%lf,%lf,%lf,%lf] , [%lf,%lf,%lf,%lf,%lf] , 'b');\nhold on;\nclear;\n",
+						X.inf(), X.sup(), X.sup(), X.inf(), X.inf(), Y.inf(), Y.inf(), Y.sup(), Y.sup(), Y.inf());
+			}
+		}
+	}
 }
 
 bool HybridReachability::declareStateVar(const string & vName)
@@ -3579,6 +4058,9 @@ bool HybridReachability::declareMode(const string & mName, const TaylorModelVec 
 	Interval intZero;
 
 	int rangeDim = uncertainties.size();
+	TaylorModelVec tmvEmpty;
+	vector<HornerForm> hfsEmpty;
+	vector<Interval> uncertainty_centers_empty;
 
 	if((iter = modeTab.find(mName)) == modeTab.end())
 	{
@@ -3587,6 +4069,16 @@ bool HybridReachability::declareMode(const string & mName, const TaylorModelVec 
 		modeNames.push_back(mName);
 
 		system.modes.push_back(modeID);
+
+		if(modeID > system.odes.size())
+		{
+			for(int i=system.odes.size(); i<modeID; ++i)
+			{
+				system.odes.push_back(tmvEmpty);
+				system.hfOdes.push_back(hfsEmpty);
+				system.uncertainty_centers.push_back(uncertainty_centers_empty);
+			}
+		}
 
 		TaylorModelVec tmvTemp = ode;
 
@@ -3629,6 +4121,8 @@ bool HybridReachability::declareMode(const string & mName, const vector<string> 
 	map<string,int>::const_iterator iter;
 	Interval intZero;
 
+	vector<string> odeEmpty;
+
 	if((iter = modeTab.find(mName)) == modeTab.end())
 	{
 		int modeID = modeNames.size();
@@ -3636,6 +4130,15 @@ bool HybridReachability::declareMode(const string & mName, const vector<string> 
 		modeNames.push_back(mName);
 
 		system.modes.push_back(modeID);
+
+		if(modeID > system.strOdes.size())
+		{
+			for(int i=system.strOdes.size(); i<modeID; ++i)
+			{
+				system.strOdes.push_back(odeEmpty);
+			}
+		}
+
 		system.strOdes.push_back(strOde);
 		system.invariants.push_back(inv);
 
@@ -3688,7 +4191,7 @@ bool HybridReachability::getModeName(string & mName, int id) const
 
 void HybridReachability::declareTrans(const int start, const int end, const vector<PolynomialConstraint> & guard, const ResetMap & reset, const int aggregType, const vector<vector<double> > & candidates)
 {
-	DiscTrans transition(start, end, guard, reset);
+	DiscTrans transition(++numOfJumps, start, end, guard, reset);
 
 	system.transitions[start].push_back(transition);
 	aggregationType[start][end] = aggregType;
@@ -4104,6 +4607,24 @@ int HybridReachability::safetyChecking()
 	int rangeDim = flowpipesCompo.front().front().tms.size();
 	Interval intZero;
 
+	bool bDumpCounterexamples = true;
+
+	int mkres = mkdir(counterexampleDir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+	if(mkres < 0 && errno != EEXIST)
+	{
+		printf("Can not create the directory for counterexamples.\n");
+		bDumpCounterexamples = false;
+	}
+
+	char filename_counterexamples[NAME_SIZE+10];
+	FILE *fpDumpCounterexamples;
+
+	if(bDumpCounterexamples)
+	{
+		sprintf(filename_counterexamples, "%s%s%s", counterexampleDir, outputFileName, str_counterexample_dumping_name_suffix);
+		fpDumpCounterexamples = fopen(filename_counterexamples, "w");
+	}
+
 	// we first check the intersection of the linear invariant constraints and linear unsafe constraints
 	for(int i=0; i<unsafeSet.size(); ++i)
 	{
@@ -4163,6 +4684,7 @@ int HybridReachability::safetyChecking()
 	list<vector<Interval> >::const_iterator doIter;
 
 	int maxOrder = 0;
+	int result = SAFE;
 
 	for(; fpIter!=flowpipesCompo.end(); ++fpIter, ++fpdoIter, ++modeIter, ++nodeIter)
 	{
@@ -4181,8 +4703,14 @@ int HybridReachability::safetyChecking()
 
 		int domainDim = doIter->size();
 
+		list<TaylorModelVec> flowpipe_counterexamples;
+		list<vector<Interval> > counterexample_domains;
+		list<Interval> localTimes;
+		Interval localTime;
+
 		for(; tmvIter!=fpIter->end(); ++tmvIter, ++doIter)
 		{
+
 			int tmp = maxOrder;
 			for(int i=0; i<tmvIter->tms.size(); ++i)
 			{
@@ -4199,6 +4727,7 @@ int HybridReachability::safetyChecking()
 			}
 
 			bool bsafe = false;
+
 			vector<Interval> tmvPolyRange;
 			tmvIter->polyRangeNormal(tmvPolyRange, step_exp_table);
 
@@ -4207,7 +4736,7 @@ int HybridReachability::safetyChecking()
 				TaylorModel tmTemp;
 
 				// interval evaluation on the constraint
-				unsafeSet[*modeIter][i].hf.insert_ctrunc_normal(tmTemp, *tmvIter, tmvPolyRange, step_exp_table, domainDim, maxOrder);
+				unsafeSet[*modeIter][i].hf.insert_normal(tmTemp, *tmvIter, tmvPolyRange, step_exp_table, domainDim);
 
 				Interval intTemp;
 				tmTemp.intEvalNormal(intTemp, step_exp_table);
@@ -4226,16 +4755,34 @@ int HybridReachability::safetyChecking()
 
 			if(!bsafe)
 			{
-				// dump the unsafe trace and the first unsafe flowpipe
+				// collect the skeptical counterexamples
 
-//				dump_skeptical_counter_example(stdout, *tmvIter, *doIter, *modeIter, *nodeIter);
+				if(bDumpCounterexamples)
+				{
+					flowpipe_counterexamples.push_back(*tmvIter);
+					counterexample_domains.push_back(*doIter);
+					localTimes.push_back(localTime);
+				}
 
-				return UNKNOWN;
+				result = UNKNOWN;
 			}
+
+			localTime += (*doIter)[0];
+		}
+
+		if(bDumpCounterexamples && flowpipe_counterexamples.size() > 0)
+		{
+			// dump the skeptical counterexamples
+			dump_potential_counterexample(fpDumpCounterexamples, flowpipe_counterexamples, counterexample_domains, *nodeIter, localTimes);
 		}
 	}
 
-	return SAFE;
+	if(bDumpCounterexamples)
+	{
+		fclose(fpDumpCounterexamples);
+	}
+
+	return result;
 }
 
 unsigned long HybridReachability::numOfFlowpipes() const
@@ -4251,27 +4798,52 @@ unsigned long HybridReachability::numOfFlowpipes() const
 	return (sum-1);
 }
 
-void HybridReachability::dump_skeptical_counter_example(FILE *fp, const TaylorModelVec & flowpipe, const vector<Interval> & domain, const int modeID, TreeNode * const node) const
+void HybridReachability::dump_potential_counterexample(FILE *fp, const list<TaylorModelVec> & flowpipes, const list<vector<Interval> > & domains, TreeNode * const node, const list<Interval> & localTimes) const
 {
-	fprintf(fp, "\n\nThe first skeptical unsafe flowpipe:\n");
-	fprintf(fp, "location: %s\n", modeNames[modeID].c_str());
-	flowpipe.dump_interval(fp, stateVarNames, tmVarNames);
-	for(int i=0; i<domain.size(); ++i)
-	{
-		fprintf(fp, "%s in ", tmVarNames[i].c_str());
-		domain[i].dump(fp);
-		fprintf(fp, "\n");
-	}
-	fprintf(fp, "\n");
+	// dump the flowpipes
+	fprintf(fp, "%s\n{\n", modeNames[node->modeID].c_str());
 
-	fprintf(fp, "Computation trace:\n");
+	list<TaylorModelVec>::const_iterator fpIter = flowpipes.begin();
+	list<vector<Interval> >::const_iterator doIter = domains.begin();
+	list<Interval>::const_iterator timeIter = localTimes.begin();
+
+	for(; fpIter!=flowpipes.end(); ++fpIter, ++doIter, ++timeIter)
+	{
+		fprintf(fp, "starting time %lf\n{\n", timeIter->sup());
+
+		fpIter->dump_interval(fp, stateVarNames, tmVarNames);
+
+		for(int i=0; i<doIter->size(); ++i)
+		{
+			fprintf(fp, "%s in ", tmVarNames[i].c_str());
+			(*doIter)[i].dump(fp);
+			fprintf(fp, "\n");
+		}
+
+		fprintf(fp, "}\n\n");
+	}
+
+	fprintf(fp, "computation path\n{\n\n");
 
 	TreeNode *iterator = node;
+
+	string strTrace;
+	char buffer[NAME_SIZE];
+
 	for(; iterator->parent != NULL; iterator = iterator->parent)
 	{
-		fprintf(fp, "%s  <-  ", modeNames[iterator->modeID].c_str());
+		string strLocalTime;
+		iterator->localTime.toString(strLocalTime);
+
+		sprintf(buffer, "( %d ", iterator->jumpID);
+		string strJumpID(buffer);
+
+		strTrace = ' ' + strJumpID + ',' + ' ' + strLocalTime + ')' + ' ' + '-' + '>' + ' ' + modeNames[iterator->modeID] + strTrace;
 	}
-	fprintf(fp, "%s\n\n", modeNames[iterator->modeID].c_str());
+
+	strTrace = modeNames[iterator->modeID] + strTrace;
+
+	fprintf(fp, "%s;\n\n}\n\n}\n\n", strTrace.c_str());
 }
 
 
@@ -4370,6 +4942,54 @@ bool compareIntercept(const FactorTab & a, const FactorTab & b)
 
 
 
+void generateNodeSeq(list<TreeNode *> & result, TreeNode *root)
+{
+	list<TreeNode *> queue;
+	queue.push_back(root);
+
+	result.clear();
+
+	for(; queue.size() > 0;)
+	{
+		TreeNode *current = queue.front();
+		queue.pop_front();
+
+		result.push_back(current);
+
+		if(current->children.size() == 0)
+		{
+			continue;
+		}
+
+		list<TreeNode *>::iterator iter = current->children.begin();
+		for(; iter != current->children.end(); ++iter)
+		{
+			queue.push_back(*iter);
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4429,7 +5049,6 @@ bool vector_selection(FactorTab & lst_selected, list<FactorTab> & lst_unselected
 	bool bvalid = false;
 
 
-
 /*
 	// =============== test begin ==================
 	printf("Candidates:\n");
@@ -4438,7 +5057,7 @@ bool vector_selection(FactorTab & lst_selected, list<FactorTab> & lst_unselected
 	{
 		printf("vector: ");
 		rowVecs[testIter->index].dump(stdout);
-		printf("\tintercept: %lf, factor: %lf\n\n", testIter->intercept, testIter->factor);
+		printf("\tintercept: %lf, factor: %lf\n\n", testIter->intercept.midpoint(), testIter->factor.midpoint());
 	}
 	// =============== test end ==================
 */
@@ -4512,7 +5131,7 @@ bool vector_selection(FactorTab & lst_selected, list<FactorTab> & lst_unselected
 		// =============== test begin ==================
 		printf("selected: ");
 		rowVecs[lst_selected.index].dump(stdout);
-		printf("\tintercept: %lf, factor: %lf\n\n\n", lst_selected.intercept, lst_selected.factor);
+		printf("\tintercept: %lf, factor: %lf\n\n\n", lst_selected.intercept.midpoint(), lst_selected.factor.midpoint());
 		// =============== test end ==================
 */
 
@@ -5030,3 +5649,9 @@ void aggregate_flowpipes_by_Parallelotope(TaylorModelVec & tmvAggregation, vecto
 		doAggregation.push_back(intUnit);
 	}
 }
+
+
+
+
+
+

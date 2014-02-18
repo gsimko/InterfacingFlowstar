@@ -17,7 +17,10 @@ class Polynomial;
 class TaylorModel;
 class TaylorModelVec;
 class Flowpipe;
-class SuppFuncFlowpipe;
+
+extern vector<Interval> factorial_rec;
+extern vector<Interval> power_4;
+extern vector<Interval> double_factorial;
 
 class RangeTree
 {
@@ -50,12 +53,13 @@ public:
 
 	// substitute the variables by the given Taylor models
 	void insert(TaylorModel & result, const TaylorModelVec & vars, const vector<Interval> & varsPolyRange, const vector<Interval> & domain) const;
+	void insert_normal(TaylorModel & result, const TaylorModelVec & vars, const vector<Interval> & varsPolyRange, const vector<Interval> & step_exp_table, const int numVars) const;
 
 	// with conservative truncation
 	void insert_ctrunc(TaylorModel & result, const TaylorModelVec & vars, const vector<Interval> & varsPolyRange, const vector<Interval> & domain, const int order) const;
 	// with non-conservative truncation
 	void insert_no_remainder(TaylorModel & result, const TaylorModelVec & vars, const int numVars, const int order) const;
-	void insert_no_remainder_no_rounding(TaylorModel & result, const TaylorModelVec & vars, const int numVars, const int order) const;
+	void insert_no_remainder_no_cutoff(TaylorModel & result, const TaylorModelVec & vars, const int numVars, const int order) const;
 
 	void insert_ctrunc_normal(TaylorModel & result, const TaylorModelVec & vars, const vector<Interval> & varsPolyRange, const vector<Interval> & step_exp_table, const int numVars, const int order) const;
 
@@ -141,6 +145,8 @@ public:
 	void rec_taylor(Polynomial & result, const int numVars, const int order) const;
 	void sin_taylor(Polynomial & result, const int numVars, const int order) const;
 	void cos_taylor(Polynomial & result, const int numVars, const int order) const;
+	void log_taylor(Polynomial & result, const int numVars, const int order) const;
+	void sqrt_taylor(Polynomial & result, const int numVars, const int order) const;
 
 	void toString(string & result, const vector<string> & varNames) const;	// transform a polynomial to a string
 
@@ -149,6 +155,10 @@ public:
 	friend class Flowpipe;
 	friend class ContinuousSystem;
 };
+
+void compute_factorial_rec(const int order);
+void compute_power_4(const int order);
+void compute_double_factorial(const int order);
 
 void computeTaylorExpansion(vector<HornerForm> & result, const vector<Polynomial> & ode, const int order);
 void computeTaylorExpansion(vector<HornerForm> & result, const vector<Polynomial> & ode, const vector<int> & orders);

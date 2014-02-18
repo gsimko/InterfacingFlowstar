@@ -186,7 +186,7 @@ DLLEXPORT bool CDECL AdvanceNonPolynomialFlowpipe (Flowpipe **result, Flowpipe* 
 	for (int i = 0; i < numVars; ++i)
 		uncertainties.push_back(Interval(0));
 		
-	bool bvalid = flowpipe->advance_non_polynomial(**result, ode, precondition, step_exp_table, step_end_exp_table, order, est, uncertainties, uncertainties);
+	bool bvalid = flowpipe->advance_non_polynomial_taylor(**result, ode, precondition, step_exp_table, step_end_exp_table, order, est, uncertainties, uncertainties);
 	
 	return bvalid;
 }
@@ -206,7 +206,7 @@ DLLEXPORT bool CDECL AdvanceAdaptiveStepNonPolynomialFlowpipe (Flowpipe **result
 	vector<Interval> uncertainties;
 	for (int i = 0; i < numVars; ++i)
 		uncertainties.push_back(Interval(0));
-	bool bvalid = flowpipe->advance_non_polynomial(**result, ode, precondition, step_exp_table, step_end_exp_table, step, miniStep, order, est, uncertainties, uncertainties);	
+	bool bvalid = flowpipe->advance_non_polynomial_taylor(**result, ode, precondition, step_exp_table, step_end_exp_table, step, miniStep, order, est, uncertainties, uncertainties);	
 	
 	return bvalid;
 }
@@ -227,7 +227,7 @@ DLLEXPORT bool CDECL AdvanceAdaptiveOrderNonPolynomialFlowpipe (Flowpipe **resul
 	for (int i = 0; i < numVars; ++i)
 		uncertainties.push_back(Interval(0));
 	int modorder = order;
-	bool bvalid = flowpipe->advance_non_polynomial(**result, ode, precondition, step_exp_table, step_end_exp_table, modorder, maxOrder, est, uncertainties, uncertainties);
+	bool bvalid = flowpipe->advance_non_polynomial_taylor(**result, ode, precondition, step_exp_table, step_end_exp_table, modorder, maxOrder, est, uncertainties, uncertainties);
 		
 	return bvalid;
 }

@@ -14,6 +14,8 @@
 
 extern int lineNum;
 
+extern mpfr_prec_t intervalNumPrecision;
+
 extern ContinuousReachability continuousProblem;
 extern HybridReachability hybridProblem;
 

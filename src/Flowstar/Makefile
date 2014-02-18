@@ -2,7 +2,7 @@ CXX = g++
 include makefile.local
 LIBS = -lmpfr -lgmp -lgsl -lgslcblas -lm -lglpk
 CFLAGS = -I . -I $(GMP_HOME) -I $(GSL_HOME) -g -O3 -Wl,--stack,16777216
-LINK_FLAGS = -g -L$(GMP_LIB_HOME) -Wl,--stack,16777216
+LINK_FLAGS = -g -L$(GMP_LIB_HOME) -Wl,--stack,16777216 -static -static-libgcc -static-libstdc++
 OBJS = $(patsubst %.o,../../obj/%.o,Interval.o Matrix.o Monomial.o Polynomial.o TaylorModel.o Continuous.o Geometry.o Constraints.o Hybrid.o modelParser.o)
 GENOBJS = $(patsubst %.o,../../obj/%.o,lex.yy.o modelParser.tab.o)
 

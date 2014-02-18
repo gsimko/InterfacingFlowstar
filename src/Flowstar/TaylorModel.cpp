@@ -134,6 +134,12 @@ void TaylorModel::inv(TaylorModel & result) const
 	remainder.inv(result.remainder);
 }
 
+void TaylorModel::inv_assign()
+{
+	expansion.inv_assign();
+	remainder.inv_assign();
+}
+
 void TaylorModel::add(TaylorModel & result, const TaylorModel & tm) const
 {
 	result.expansion = expansion + tm.expansion;
@@ -232,7 +238,7 @@ void TaylorModel::mul_no_remainder(TaylorModel & result, const TaylorModel & tm,
 	result.expansion.cutoff();
 }
 
-void TaylorModel::mul_no_remainder_no_rounding(TaylorModel & result, const TaylorModel & tm, const int order) const
+void TaylorModel::mul_no_remainder_no_cutoff(TaylorModel & result, const TaylorModel & tm, const int order) const
 {
 	result.expansion = expansion * tm.expansion;
 	result.expansion.nctrunc(order);
@@ -265,10 +271,10 @@ void TaylorModel::mul_no_remainder_assign(const TaylorModel & tm, const int orde
 	*this = result;
 }
 
-void TaylorModel::mul_no_remainder_no_rounding_assign(const TaylorModel & tm, const int order)
+void TaylorModel::mul_no_remainder_no_cutoff_assign(const TaylorModel & tm, const int order)
 {
 	TaylorModel result;
-	mul_no_remainder_no_rounding(result, tm, order);
+	mul_no_remainder_no_cutoff(result, tm, order);
 	*this = result;
 }
 
@@ -308,6 +314,37 @@ void TaylorModel::mul_insert(TaylorModel & result, const TaylorModel & tm, const
 
 	result.cutoff(domain);
 }
+
+void TaylorModel::mul_insert_normal(TaylorModel & result, const TaylorModel & tm, const Interval & tmPolyRange, const vector<Interval> & step_exp_table) const
+{
+	Interval intZero;
+	Polynomial P1xP2;
+	Interval P1xI2, P2xI1, I1xI2;
+
+	P1xP2 = expansion * tm.expansion;
+
+	if(!tm.remainder.subseteq(intZero))
+	{
+		expansion.intEvalNormal(P1xI2, step_exp_table);
+		P1xI2 *= tm.remainder;
+	}
+
+	if(!remainder.subseteq(intZero))
+	{
+		P2xI1 = tmPolyRange * remainder;
+	}
+
+	I1xI2 = remainder * tm.remainder;
+
+	result.expansion = P1xP2;
+
+	result.remainder = I1xI2;
+	result.remainder += P2xI1;
+	result.remainder += P1xI2;
+
+	result.cutoff_normal(step_exp_table);
+}
+
 
 void TaylorModel::mul_insert_ctrunc(TaylorModel & result, const TaylorModel & tm, const Interval & tmPolyRange, const vector<Interval> & domain, const int order) const
 {
@@ -415,6 +452,13 @@ void TaylorModel::mul_insert_assign(const TaylorModel & tm, const Interval & tmP
 {
 	TaylorModel result;
 	mul_insert(result, tm, tmPolyRange, domain);
+	*this = result;
+}
+
+void TaylorModel::mul_insert_normal_assign(const TaylorModel & tm, const Interval & tmPolyRange, const vector<Interval> & step_exp_table)
+{
+	TaylorModel result;
+	mul_insert_normal(result, tm, tmPolyRange, step_exp_table);
 	*this = result;
 }
 
@@ -640,7 +684,7 @@ void TaylorModel::insert_no_remainder(TaylorModel & result, const TaylorModelVec
 	}
 }
 
-void TaylorModel::insert_no_remainder_no_rounding(TaylorModel & result, const TaylorModelVec & vars, const int numVars, const int order) const
+void TaylorModel::insert_no_remainder_no_cutoff(TaylorModel & result, const TaylorModelVec & vars, const int numVars, const int order) const
 {
 	if(vars.tms.size() == 0)
 	{
@@ -665,7 +709,7 @@ void TaylorModel::insert_no_remainder_no_rounding(TaylorModel & result, const Ta
 		HornerForm hf;
 		expansion.toHornerForm(hf);
 
-		hf.insert_no_remainder_no_rounding(result, vars, numVars, order);
+		hf.insert_no_remainder_no_cutoff(result, vars, numVars, order);
 	}
 }
 
@@ -849,7 +893,7 @@ void TaylorModel::normalize(vector<Interval> & domain)
 	}
 
 	TaylorModel tmTemp;
-	insert_no_remainder_no_rounding(tmTemp, newVars, domainDim, degree());
+	insert_no_remainder_no_cutoff(tmTemp, newVars, domainDim, degree());
 	expansion = tmTemp.expansion;
 }
 
@@ -944,8 +988,8 @@ void TaylorModel::rec_taylor(TaylorModel & result, list<Interval> & ranges, cons
 
 	if(tmF.isZero())			// tm = c
 	{
-		TaylorModel tmExp(const_part, numVars);
-		result = tmExp;
+		TaylorModel tmRec(const_part, numVars);
+		result = tmRec;
 
 		Interval invalid(1,-1);
 		ranges.push_back(invalid);
@@ -953,7 +997,7 @@ void TaylorModel::rec_taylor(TaylorModel & result, list<Interval> & ranges, cons
 		return;
 	}
 
-	Interval I(1), mI(-1);
+	Interval I(1);
 	TaylorModel tmOne(I, numVars);
 	TaylorModel tmF_c;
 
@@ -969,7 +1013,7 @@ void TaylorModel::rec_taylor(TaylorModel & result, list<Interval> & ranges, cons
 
 	for(int i=order; i>0; --i)
 	{
-		result.mul_assign(mI);
+		result.inv_assign();
 
 		Interval tm1Poly, intTrunc;
 		result.mul_insert_ctrunc_normal_assign(tm1Poly, intTrunc, tmF_c, tmF_cPolyRange, step_exp_table, order);
@@ -1010,8 +1054,8 @@ void TaylorModel::sin_taylor(TaylorModel & result, list<Interval> & ranges, cons
 	if(tmF.isZero())			// tm = c
 	{
 		const_part.sin_assign();
-		TaylorModel tmExp(const_part, numVars);
-		result = tmExp;
+		TaylorModel tmSin(const_part, numVars);
+		result = tmSin;
 
 		Interval invalid(1,-1);
 		ranges.push_back(invalid);
@@ -1153,8 +1197,8 @@ void TaylorModel::cos_taylor(TaylorModel & result, list<Interval> & ranges, cons
 	if(tmF.isZero())			// tm = c
 	{
 		const_part.cos_assign();
-		TaylorModel tmExp(const_part, numVars);
-		result = tmExp;
+		TaylorModel tmCos(const_part, numVars);
+		result = tmCos;
 
 		Interval invalid(1,-1);
 		ranges.push_back(invalid);
@@ -1281,6 +1325,163 @@ void TaylorModel::cos_taylor(TaylorModel & result, list<Interval> & ranges, cons
 	cos_taylor_remainder(rem, const_part, tmRange, order+1);
 
 	result.remainder += rem;
+}
+
+void TaylorModel::log_taylor(TaylorModel & result, list<Interval> & ranges, const vector<Interval> & step_exp_table, const int numVars, const int order) const
+{
+	Interval const_part;
+
+	TaylorModel tmF = *this;
+
+	// remove the center point of tm
+	tmF.constant(const_part);
+	tmF.rmConstant();			// F = tm - c
+
+	Interval C = const_part;
+	ranges.push_back(const_part);			// keep the unchanged part
+
+	const_part.log_assign();	// log(c)
+
+	if(tmF.isZero())			// tm = c
+	{
+		TaylorModel tmLog(const_part, numVars);
+		result = tmLog;
+
+		Interval invalid(1,-1);
+		ranges.push_back(invalid);
+
+		return;
+	}
+
+	TaylorModel tmF_c;
+	tmF.div(tmF_c, C);
+
+	result = tmF_c;
+
+	Interval I((double)order);
+	result.div_assign(I);			// F/c * (1/order)
+
+	Interval tmF_cPolyRange;
+	tmF_c.polyRangeNormal(tmF_cPolyRange, step_exp_table);
+
+	for(int i=order; i>=2; --i)
+	{
+		Interval J(1);
+		J.div_assign((double)(i-1));
+		TaylorModel tmJ(J, numVars);
+
+		result.sub_assign(tmJ);
+		result.inv_assign();
+
+		Interval tm1Poly, intTrunc;
+		result.mul_insert_ctrunc_normal_assign(tm1Poly, intTrunc, tmF_c, tmF_cPolyRange, step_exp_table, order);
+
+		ranges.push_back(tm1Poly);			// keep the unchanged part
+		ranges.push_back(tmF_cPolyRange);	// keep the unchanged part
+		ranges.push_back(intTrunc);			// keep the unchanged part
+	}
+
+	TaylorModel const_part_tm(const_part, numVars);
+	result.add_assign(const_part_tm);
+
+	Interval intRound;
+	result.expansion.cutoff_normal(intRound, step_exp_table);
+	ranges.push_back(intRound);				// keep the unchanged part
+	result.remainder += intRound;
+
+	Interval rem, tmF_cRange;
+	ranges.push_back(tmF_cPolyRange);		// keep the unchanged part
+	tmF_cRange = tmF_cPolyRange + tmF_c.remainder;
+
+	log_taylor_remainder(rem, tmF_cRange, order+1);
+
+	result.remainder += rem;
+}
+
+void TaylorModel::sqrt_taylor(TaylorModel & result, list<Interval> & ranges, const vector<Interval> & step_exp_table, const int numVars, const int order) const
+{
+	Interval const_part;
+
+	TaylorModel tmF = *this;
+
+	// remove the center point of tm
+	tmF.constant(const_part);
+	tmF.rmConstant();			// F = tm - c
+
+	Interval C = const_part;
+	ranges.push_back(const_part);			// keep the unchanged part
+
+	const_part.sqrt_assign();	// log(c)
+
+	if(tmF.isZero())			// tm = c
+	{
+		TaylorModel tmSqrt(const_part, numVars);
+		result = tmSqrt;
+
+		Interval invalid(1,-1);
+		ranges.push_back(invalid);
+
+		return;
+	}
+
+	TaylorModel tmF_2c;
+	tmF.div(tmF_2c, C);
+
+	Interval intTwo(2);
+	tmF_2c.div_assign(intTwo);	// F/2c
+
+	Interval intOne(1);
+	TaylorModel tmOne(intOne, numVars);
+
+	result = tmF_2c;
+
+	Interval K(1), J(1);
+
+	Interval tmF_2cPolyRange;
+	tmF_2c.polyRangeNormal(tmF_2cPolyRange, step_exp_table);
+
+	for(int i=order, j=2*order-3; i>=2; --i, j-=2)
+	{
+		// i
+		Interval K((double)i);
+
+		// j = 2*i-3
+		Interval J((double)j);
+
+		result.inv_assign();
+		result.mul_assign( J / K );
+
+		result.add_assign(tmOne);
+
+		Interval tm1Poly, intTrunc;
+		result.mul_insert_ctrunc_normal_assign(tm1Poly, intTrunc, tmF_2c, tmF_2cPolyRange, step_exp_table, order);
+
+		ranges.push_back(tm1Poly);			// keep the unchanged part
+		ranges.push_back(tmF_2cPolyRange);	// keep the unchanged part
+		ranges.push_back(intTrunc);			// keep the unchanged part
+	}
+
+	result.add_assign(tmOne);
+
+	result.mul_assign(const_part);
+
+	Interval intRound;
+	result.expansion.cutoff_normal(intRound, step_exp_table);
+	ranges.push_back(intRound);				// keep the unchanged part
+	result.remainder += intRound;
+
+	Interval rem, tmF_cRange = tmF_2cPolyRange;
+	tmF_cRange.mul_assign(2.0);
+
+	ranges.push_back(tmF_cRange);			// keep the unchanged part
+
+	Interval tmF_c_remainder = tmF_2c.remainder;
+	tmF_c_remainder.mul_assign(2.0);
+	tmF_cRange += tmF_c_remainder;
+
+	sqrt_taylor_remainder(rem, tmF_cRange, order+1);
+
+	result.remainder += rem * const_part;
 }
 
 Interval TaylorModel::getRemainder() const
@@ -1669,19 +1870,6 @@ void TaylorModelVec::derivative(TaylorModelVec & result, const int varIndex) con
 	}
 }
 
-/*
-void TaylorModelVec::LieDerivative_ctrunc(TaylorModelVec & result, const TaylorModelVec & f, const vector<Interval> & domain, const int order) const
-{
-	result.clear();
-	for(int i=0; i<tms.size(); ++i)
-	{
-		TaylorModel tmTemp;
-		tms[i].LieDerivative_ctrunc(tmTemp, f, domain, order);
-		result.tms.push_back(tmTemp);
-	}
-}
-*/
-
 void TaylorModelVec::LieDerivative_no_remainder(TaylorModelVec & result, const TaylorModelVec & f, const int order) const
 {
 	result.clear();
@@ -1693,30 +1881,6 @@ void TaylorModelVec::LieDerivative_no_remainder(TaylorModelVec & result, const T
 	}
 }
 
-/*
-void TaylorModelVec::LieDerivative_ctrunc_normal(TaylorModelVec & result, const TaylorModelVec & f, const vector<Interval> & step_exp_table, const int order) const
-{
-	result.clear();
-	for(int i=0; i<tms.size(); ++i)
-	{
-		TaylorModel tmTemp;
-		tms[i].LieDerivative_ctrunc_normal(tmTemp, f, step_exp_table, order);
-		result.tms.push_back(tmTemp);
-	}
-}
-
-void TaylorModelVec::LieDerivative_ctrunc(TaylorModelVec & result, const TaylorModelVec & f, const vector<Interval> & domain, const vector<int> & orders) const
-{
-	result.clear();
-	for(int i=0; i<tms.size(); ++i)
-	{
-		TaylorModel tmTemp;
-		tms[i].LieDerivative_ctrunc(tmTemp, f, domain, orders[i]);
-		result.tms.push_back(tmTemp);
-	}
-}
-*/
-
 void TaylorModelVec::LieDerivative_no_remainder(TaylorModelVec & result, const TaylorModelVec & f, const vector<int> & orders) const
 {
 	result.clear();
@@ -1727,19 +1891,6 @@ void TaylorModelVec::LieDerivative_no_remainder(TaylorModelVec & result, const T
 		result.tms.push_back(tmTemp);
 	}
 }
-
-/*
-void TaylorModelVec::LieDerivative_ctrunc_normal(TaylorModelVec & result, const TaylorModelVec & f, const vector<Interval> & step_exp_table, const vector<int> & orders) const
-{
-	result.clear();
-	for(int i=0; i<tms.size(); ++i)
-	{
-		TaylorModel tmTemp;
-		tms[i].LieDerivative_ctrunc_normal(tmTemp, f, step_exp_table, orders[i]);
-		result.tms.push_back(tmTemp);
-	}
-}
-*/
 
 void TaylorModelVec::integral(TaylorModelVec & result, const Interval & I) const
 {
@@ -2093,67 +2244,35 @@ void TaylorModelVec::Picard_only_remainder(vector<Interval> & result, vector<Ran
 	}
 }
 
-/*
-void TaylorModelVec::Picard_ctrunc(TaylorModelVec & result, const TaylorModelVec & x0, const vector<HornerForm> & ode, const vector<Interval> & domain, const vector<int> & orders) const
+void TaylorModelVec::Picard_no_remainder(TaylorModelVec & result, const TaylorModelVec & x0, const vector<HornerForm> & ode, const int numVars, const vector<int> & orders, const vector<bool> & bIncreased) const
 {
-	TaylorModelVec tmvTemp;
+	result = *this;
 
 	for(int i=0; i<ode.size(); ++i)
 	{
-		TaylorModel tmTemp;
-		if(orders[i] <= 1)
+		if(bIncreased[i])
 		{
-			ode[i].insert_ctrunc(tmTemp, *this, domain, 0);
+			TaylorModel tmTemp;
+			if(orders[i] <= 1)
+			{
+				ode[i].insert_no_remainder(tmTemp, *this, numVars, 0);
+			}
+			else
+			{
+				ode[i].insert_no_remainder(tmTemp, *this, numVars, orders[i]-1);
+			}
+
+			TaylorModel tmTemp2;
+			tmTemp.integral_no_remainder(tmTemp2);
+			x0.tms[i].add(result.tms[i], tmTemp2);
 		}
-		else
-		{
-			ode[i].insert_ctrunc(tmTemp, *this, domain, orders[i]-1);
-		}
-		tmvTemp.tms.push_back(tmTemp);
 	}
-
-	TaylorModelVec tmvTemp2;
-	tmvTemp.integral(tmvTemp2, domain[0]);
-
-	x0.add(result, tmvTemp2);
 }
 
-void TaylorModelVec::Picard_ctrunc_assign(const TaylorModelVec & x0, const vector<HornerForm> & ode, const vector<Interval> & domain, const vector<int> & orders)
+void TaylorModelVec::Picard_no_remainder_assign(const TaylorModelVec & x0, const vector<HornerForm> & ode, const int numVars, const vector<int> & orders, const vector<bool> & bIncreased)
 {
 	TaylorModelVec result;
-	Picard_ctrunc(result, x0, ode, domain, orders);
-	*this = result;
-}
-*/
-
-void TaylorModelVec::Picard_no_remainder(TaylorModelVec & result, const TaylorModelVec & x0, const vector<HornerForm> & ode, const int numVars, const vector<int> & orders) const
-{
-	TaylorModelVec tmvTemp;
-
-	for(int i=0; i<ode.size(); ++i)
-	{
-		TaylorModel tmTemp;
-		if(orders[i] <= 1)
-		{
-			ode[i].insert_no_remainder(tmTemp, *this, numVars, 0);
-		}
-		else
-		{
-			ode[i].insert_no_remainder(tmTemp, *this, numVars, orders[i]-1);
-		}
-		tmvTemp.tms.push_back(tmTemp);
-	}
-
-	TaylorModelVec tmvTemp2;
-	tmvTemp.integral_no_remainder(tmvTemp2);
-
-	x0.add(result, tmvTemp2);
-}
-
-void TaylorModelVec::Picard_no_remainder_assign(const TaylorModelVec & x0, const vector<HornerForm> & ode, const int numVars, const vector<int> & orders)
-{
-	TaylorModelVec result;
-	Picard_no_remainder(result, x0, ode, numVars, orders);
+	Picard_no_remainder(result, x0, ode, numVars, orders, bIncreased);
 	*this = result;
 }
 
@@ -2188,7 +2307,8 @@ void TaylorModelVec::Picard_ctrunc_normal_assign(const TaylorModelVec & x0, cons
 	*this = result;
 }
 
-void TaylorModelVec::Picard_non_polynomial_no_remainder(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const int order, const vector<Interval> & uncertainty_centers) const
+// using Taylor approximation
+void TaylorModelVec::Picard_non_polynomial_taylor_no_remainder(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const int order, const vector<Interval> & uncertainty_centers) const
 {
 	TaylorModelVec tmvTemp;
 	Interval intZero;
@@ -2214,8 +2334,6 @@ void TaylorModelVec::Picard_non_polynomial_no_remainder(TaylorModelVec & result,
 	{
 		parseSetting.strODE = prefix + strOde[i] + suffix;
 
-		//cout << parseSetting.strODE << endl;
-		
 		parseODE();		// call the parser
 
 		TaylorModel tmTemp(parseResult.expansion, intZero);
@@ -2235,16 +2353,17 @@ void TaylorModelVec::Picard_non_polynomial_no_remainder(TaylorModelVec & result,
 	x0.add(result, tmvTemp2);
 }
 
-void TaylorModelVec::Picard_non_polynomial_no_remainder_assign(const TaylorModelVec & x0, const vector<string> & strOde, const int order, const vector<Interval> & uncertainty_centers)
+void TaylorModelVec::Picard_non_polynomial_taylor_no_remainder_assign(const TaylorModelVec & x0, const vector<string> & strOde, const int order, const vector<Interval> & uncertainty_centers)
 {
 	TaylorModelVec result;
-	Picard_non_polynomial_no_remainder(result, x0, strOde, order, uncertainty_centers);
+	Picard_non_polynomial_taylor_no_remainder(result, x0, strOde, order, uncertainty_centers);
 	*this = result;
 }
 
-void TaylorModelVec::Picard_non_polynomial_no_remainder(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const vector<int> & orders, const vector<Interval> & uncertainty_centers) const
+void TaylorModelVec::Picard_non_polynomial_taylor_no_remainder(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const vector<int> & orders, const vector<bool> & bIncreased, const vector<Interval> & uncertainty_centers) const
 {
-	TaylorModelVec tmvTemp;
+	result = *this;
+
 	Interval intZero;
 	int rangeDim = strOde.size();
 
@@ -2257,44 +2376,44 @@ void TaylorModelVec::Picard_non_polynomial_no_remainder(TaylorModelVec & result,
 
 	for(int i=0; i<strOde.size(); ++i)
 	{
-		if(orders[i] <= 1)
+		if(bIncreased[i])
 		{
-			parseSetting.order = 0;
+			if(orders[i] <= 1)
+			{
+				parseSetting.order = 0;
+			}
+			else
+			{
+				parseSetting.order = orders[i]-1;
+			}
+
+			parseSetting.strODE = prefix + strOde[i] + suffix;
+
+			parseODE();		// call the parser
+
+			TaylorModel tmTemp(parseResult.expansion, intZero);
+
+			if(!uncertainty_centers[i].subseteq(intZero))
+			{
+				TaylorModel tmCenter(uncertainty_centers[i], rangeDim+1);
+				tmTemp.add_assign(tmCenter);
+			}
+
+			TaylorModel tmTemp2;
+			tmTemp.integral_no_remainder(tmTemp2);
+			x0.tms[i].add(result.tms[i], tmTemp2);
 		}
-		else
-		{
-			parseSetting.order = orders[i]-1;
-		}
-
-		parseSetting.strODE = prefix + strOde[i] + suffix;
-
-		parseODE();		// call the parser
-
-		TaylorModel tmTemp(parseResult.expansion, intZero);
-
-		if(!uncertainty_centers[i].subseteq(intZero))
-		{
-			TaylorModel tmCenter(uncertainty_centers[i], rangeDim+1);
-			tmTemp.add_assign(tmCenter);
-		}
-
-		tmvTemp.tms.push_back(tmTemp);
 	}
-
-	TaylorModelVec tmvTemp2;
-	tmvTemp.integral_no_remainder(tmvTemp2);
-
-	x0.add(result, tmvTemp2);
 }
 
-void TaylorModelVec::Picard_non_polynomial_no_remainder_assign(const TaylorModelVec & x0, const vector<string> & strOde, const vector<int> & orders, const vector<Interval> & uncertainty_centers)
+void TaylorModelVec::Picard_non_polynomial_taylor_no_remainder_assign(const TaylorModelVec & x0, const vector<string> & strOde, const vector<int> & orders, const vector<bool> & bIncreased, const vector<Interval> & uncertainty_centers)
 {
 	TaylorModelVec result;
-	Picard_non_polynomial_no_remainder(result, x0, strOde, orders, uncertainty_centers);
+	Picard_non_polynomial_taylor_no_remainder(result, x0, strOde, orders, bIncreased, uncertainty_centers);
 	*this = result;
 }
 
-void TaylorModelVec::Picard_non_polynomial_ctrunc_normal(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const int order, const vector<Interval> & uncertainty_centers) const
+void TaylorModelVec::Picard_non_polynomial_taylor_ctrunc_normal(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const int order, const vector<Interval> & uncertainty_centers) const
 {
 	TaylorModelVec tmvTemp;
 	Interval intZero;
@@ -2340,14 +2459,14 @@ void TaylorModelVec::Picard_non_polynomial_ctrunc_normal(TaylorModelVec & result
 	x0.add(result, tmvTemp2);
 }
 
-void TaylorModelVec::Picard_non_polynomial_ctrunc_normal_assign(const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const int order, const vector<Interval> & uncertainty_centers)
+void TaylorModelVec::Picard_non_polynomial_taylor_ctrunc_normal_assign(const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const int order, const vector<Interval> & uncertainty_centers)
 {
 	TaylorModelVec result;
-	Picard_non_polynomial_ctrunc_normal(result, x0, strOde, step_exp_table, order, uncertainty_centers);
+	Picard_non_polynomial_taylor_ctrunc_normal(result, x0, strOde, step_exp_table, order, uncertainty_centers);
 	*this = result;
 }
 
-void TaylorModelVec::Picard_non_polynomial_ctrunc_normal(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const vector<int> & orders, const vector<Interval> & uncertainty_centers) const
+void TaylorModelVec::Picard_non_polynomial_taylor_ctrunc_normal(TaylorModelVec & result, const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const vector<int> & orders, const vector<Interval> & uncertainty_centers) const
 {
 	TaylorModelVec tmvTemp;
 	Interval intZero;
@@ -2393,14 +2512,14 @@ void TaylorModelVec::Picard_non_polynomial_ctrunc_normal(TaylorModelVec & result
 	x0.add(result, tmvTemp2);
 }
 
-void TaylorModelVec::Picard_non_polynomial_ctrunc_normal_assign(const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const vector<int> & orders, const vector<Interval> & uncertainty_centers)
+void TaylorModelVec::Picard_non_polynomial_taylor_ctrunc_normal_assign(const TaylorModelVec & x0, const vector<string> & strOde, const vector<Interval> & step_exp_table, const vector<int> & orders, const vector<Interval> & uncertainty_centers)
 {
 	TaylorModelVec result;
-	Picard_non_polynomial_ctrunc_normal(result, x0, strOde, step_exp_table, orders, uncertainty_centers);
+	Picard_non_polynomial_taylor_ctrunc_normal(result, x0, strOde, step_exp_table, orders, uncertainty_centers);
 	*this = result;
 }
 
-void TaylorModelVec::Picard_non_polynomial_only_remainder(vector<Interval> & result, const TaylorModelVec & x0, const vector<string> & strOde, const Interval & timeStep) const
+void TaylorModelVec::Picard_non_polynomial_taylor_only_remainder(vector<Interval> & result, const TaylorModelVec & x0, const vector<string> & strOde, const Interval & timeStep, const int order) const
 {
 	result.clear();
 
@@ -2409,6 +2528,15 @@ void TaylorModelVec::Picard_non_polynomial_only_remainder(vector<Interval> & res
 
 	parseSetting.flowpipe = *this;
 	parseSetting.iterRange = parseSetting.ranges.begin();
+
+	if(order <= 1)
+	{
+		parseSetting.order = 0;
+	}
+	else
+	{
+		parseSetting.order = order-1;
+	}
 
 	for(int i=0; i<strOde.size(); ++i)
 	{
@@ -2421,16 +2549,38 @@ void TaylorModelVec::Picard_non_polynomial_only_remainder(vector<Interval> & res
 		intTemp = parseResult.remainder * timeStep;
 		result.push_back(intTemp);
 	}
-/*
-	if(parseSetting.iterRange == parseSetting.ranges.end())
+}
+
+void TaylorModelVec::Picard_non_polynomial_taylor_only_remainder(vector<Interval> & result, const TaylorModelVec & x0, const vector<string> & strOde, const Interval & timeStep, const vector<int> & orders) const
+{
+	result.clear();
+
+	string prefix(str_prefix_taylor_remainder);
+	string suffix(str_suffix);
+
+	parseSetting.flowpipe = *this;
+	parseSetting.iterRange = parseSetting.ranges.begin();
+
+	for(int i=0; i<strOde.size(); ++i)
 	{
-		printf("correct\n");
+		if(orders[i] <= 1)
+		{
+			parseSetting.order = 0;
+		}
+		else
+		{
+			parseSetting.order = orders[i]-1;
+		}
+
+		Interval intTemp;
+
+		parseSetting.strODE = prefix + strOde[i] + suffix;
+
+		parseODE();		// call the parser
+
+		intTemp = parseResult.remainder * timeStep;
+		result.push_back(intTemp);
 	}
-	else
-	{
-		printf("error!\n");
-	}
-*/
 }
 
 void TaylorModelVec::normalize(vector<Interval> & domain)
@@ -2485,7 +2635,7 @@ void TaylorModelVec::normalize(vector<Interval> & domain)
 	for(int i=0; i<tms.size(); ++i)
 	{
 		TaylorModel tmTemp;
-		tms[i].insert_no_remainder_no_rounding(tmTemp, newVars, domainDim, tms[i].degree());
+		tms[i].insert_no_remainder_no_cutoff(tmTemp, newVars, domainDim, tms[i].degree());
 		tms[i].expansion = tmTemp.expansion;
 	}
 }
@@ -2551,11 +2701,12 @@ ParseSetting::ParseSetting()
 ParseSetting::ParseSetting(const ParseSetting & setting)
 {
 	strODE = setting.strODE;
+
 	ranges = setting.ranges;
-	step_exp_table = setting.step_exp_table;
 	iterRange = setting.iterRange;
+
+	step_exp_table = setting.step_exp_table;
 	flowpipe = setting.flowpipe;
-	strReplace = setting.strReplace;
 	order = setting.order;
 }
 
@@ -2563,14 +2714,14 @@ ParseSetting::~ParseSetting()
 {
 	ranges.clear();
 	step_exp_table.clear();
-	strReplace.clear();
 }
 
 void ParseSetting::clear()
 {
 	ranges.clear();
+	iterRange = ranges.begin();
+
 	step_exp_table.clear();
-	strReplace.clear();
 }
 
 ParseSetting & ParseSetting::operator = (const ParseSetting & setting)
@@ -2579,11 +2730,12 @@ ParseSetting & ParseSetting::operator = (const ParseSetting & setting)
 		return *this;
 
 	strODE = setting.strODE;
+
 	ranges = setting.ranges;
-	step_exp_table = setting.step_exp_table;
 	iterRange = setting.iterRange;
+
+	step_exp_table = setting.step_exp_table;
 	flowpipe = setting.flowpipe;
-	strReplace = setting.strReplace;
 	order = setting.order;
 
 	return *this;
@@ -2627,7 +2779,6 @@ ParseResult::ParseResult(const ParseResult & result)
 {
 	expansion = result.expansion;
 	remainder = result.remainder;
-	replaceResult = result.replaceResult;
 }
 
 ParseResult::~ParseResult()
@@ -2641,7 +2792,6 @@ ParseResult & ParseResult::operator = (const ParseResult & result)
 
 	expansion = result.expansion;
 	remainder = result.remainder;
-	replaceResult = result.replaceResult;
 
 	return *this;
 }
@@ -2668,12 +2818,10 @@ ParseResult & ParseResult::operator = (const ParseResult & result)
 
 void exp_taylor_remainder(Interval & result, const Interval & tmRange, const int order)
 {
-	Interval I(1);
 	Interval intProd = tmRange;
 
 	for(int i=2; i<=order; ++i)
 	{
-		I.div_assign((double)i);
 		intProd *= tmRange;
 	}
 
@@ -2681,7 +2829,7 @@ void exp_taylor_remainder(Interval & result, const Interval & tmRange, const int
 	J *= tmRange;
 	J.exp_assign();
 
-	result = I * intProd * J;
+	result = factorial_rec[order] * intProd * J;
 }
 
 void rec_taylor_remainder(Interval & result, const Interval & tmRange, const int order)
@@ -2707,11 +2855,10 @@ void rec_taylor_remainder(Interval & result, const Interval & tmRange, const int
 
 void sin_taylor_remainder(Interval & result, const Interval & C, const Interval & tmRange, const int order)
 {
-	Interval I(1), intProd(tmRange);
+	Interval intProd(tmRange);
 
 	for(int i=2; i<=order; ++i)
 	{
-		I.div_assign((double)i);
 		intProd *= tmRange;
 	}
 
@@ -2739,16 +2886,15 @@ void sin_taylor_remainder(Interval & result, const Interval & C, const Interval 
 		break;
 	}
 
-	result = I * intProd * J;
+	result = factorial_rec[order] * intProd * J;
 }
 
 void cos_taylor_remainder(Interval & result, const Interval & C, const Interval & tmRange, const int order)
 {
-	Interval I(1), intProd(tmRange);
+	Interval intProd(tmRange);
 
 	for(int i=2; i<=order; ++i)
 	{
-		I.div_assign((double)i);
 		intProd *= tmRange;
 	}
 
@@ -2776,8 +2922,84 @@ void cos_taylor_remainder(Interval & result, const Interval & C, const Interval 
 		break;
 	}
 
-	result = I * intProd * J;
+	result = factorial_rec[order] * intProd * J;
 }
+
+void log_taylor_remainder(Interval & result, const Interval & tmRange, const int order)
+{
+	Interval J(0,1);
+	J *= tmRange;
+	J.add_assign(1.0);
+	J.rec_assign();
+
+	Interval I = tmRange;
+	I *= J;
+
+	result = I;
+
+	for(int i=2; i<=order; ++i)
+	{
+		result *= I;
+	}
+
+	result.div_assign((double)order);
+
+	if((order+1)%2 == 1)		// order+1 is odd
+	{
+		result.inv_assign();
+	}
+}
+
+void sqrt_taylor_remainder(Interval & result, const Interval & tmRange, const int order)
+{
+	Interval I(0,1);
+	I *= tmRange;
+	I.add_assign(1.0);
+	I.rec_assign();
+
+	Interval intTemp;
+	I.sqrt(intTemp);
+
+	I *= tmRange;
+	I.div_assign(2.0);
+
+	Interval intProd = I;
+
+	int n = order-1;
+	for(int i=2; i<=n; ++i)
+	{
+		intProd *= I;
+	}
+
+	intProd /= intTemp;
+	intProd *= tmRange;
+	intProd.div_assign(2.0);
+
+	result = double_factorial[2*order-3] * factorial_rec[order] * intProd;
+
+	if(order % 2 == 0)
+	{
+		result.inv_assign();
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void exp_taylor_only_remainder(Interval & result, const Interval & remainder, list<Interval>::iterator & iterRange, const int order)
 {
@@ -2792,8 +3014,6 @@ void exp_taylor_only_remainder(Interval & result, const Interval & remainder, li
 
 	Interval const_part = *iterRange;
 	++iterRange;
-
-	Interval I(1);
 
 	for(int i=order; i>0; --i)
 	{
@@ -2812,12 +3032,11 @@ void exp_taylor_only_remainder(Interval & result, const Interval & remainder, li
 		++iterRange;
 
 		result = intTemp;
-		result += I;
 	}
 
 	result *= const_part;
 
-	result += (*iterRange);		// rounding error
+	result += (*iterRange);		// cutoff error
 	++iterRange;
 
 	Interval tmRange = (*iterRange) + remainder;
@@ -2844,11 +3063,9 @@ void rec_taylor_only_remainder(Interval & result, const Interval & remainder, li
 
 	Interval tmF_c_remainder = remainder * const_part;
 
-	Interval I(1), mI(-1);
-
 	for(int i=order; i>0; --i)
 	{
-		result *= mI;
+		result.inv_assign();
 
 		Interval intTemp;
 		intTemp = (*iterRange) * tmF_c_remainder;	// P1 x I2
@@ -2860,12 +3077,11 @@ void rec_taylor_only_remainder(Interval & result, const Interval & remainder, li
 		++iterRange;
 
 		result = intTemp;
-		result += I;
 	}
 
 	result *= const_part;
 
-	result += (*iterRange);		// rounding error
+	result += (*iterRange);		// cutoff error
 	++iterRange;
 
 	Interval rem, tmF_cRange;
@@ -2914,7 +3130,7 @@ void sin_taylor_only_remainder(Interval & result, const Interval & remainder, li
 		result += intTemp2;
 	}
 
-	result += (*iterRange);		// rounding error
+	result += (*iterRange);		// cutoff error
 	++iterRange;
 
 	Interval tmRange, rem;
@@ -2965,7 +3181,7 @@ void cos_taylor_only_remainder(Interval & result, const Interval & remainder, li
 		result += intTemp2;
 	}
 
-	result += (*iterRange);		// rounding error
+	result += (*iterRange);		// cutoff error
 	++iterRange;
 
 	Interval tmRange, rem;
@@ -2976,3 +3192,126 @@ void cos_taylor_only_remainder(Interval & result, const Interval & remainder, li
 
 	result += rem;
 }
+
+void log_taylor_only_remainder(Interval & result, const Interval & remainder, list<Interval>::iterator & iterRange, const int order)
+{
+	Interval intZero;
+	result = intZero;
+
+	if(!iterRange->valid())
+	{
+		++iterRange;
+		return;
+	}
+
+	Interval C = *iterRange;
+	++iterRange;
+
+	Interval const_part = C;
+	const_part.log_assign();
+
+	Interval tmF_c_remainder = remainder / C;
+
+	result = tmF_c_remainder;
+	result.div_assign((double)order);
+
+	for(int i=order; i>=2; --i)
+	{
+		result.inv_assign();
+
+		Interval intTemp;
+		intTemp = (*iterRange) * tmF_c_remainder;	// P1 x I2
+		++iterRange;
+		intTemp += (*iterRange) * result;			// P2 x I1
+		intTemp += tmF_c_remainder * result;		// I2 x I1
+		++iterRange;
+		intTemp += (*iterRange);					// truncation
+		++iterRange;
+
+		result = intTemp;
+	}
+
+	result += (*iterRange);		// cutoff error
+	++iterRange;
+
+	Interval rem, tmF_cRange;
+	tmF_cRange = (*iterRange) + tmF_c_remainder;
+	++iterRange;
+
+	log_taylor_remainder(rem, tmF_cRange, order+1);
+
+	result += rem;
+}
+
+void sqrt_taylor_only_remainder(Interval & result, const Interval & remainder, list<Interval>::iterator & iterRange, const int order)
+{
+	Interval intZero;
+	result = intZero;
+
+	if(!iterRange->valid())
+	{
+		++iterRange;
+		return;
+	}
+
+	Interval C = *iterRange;
+	++iterRange;
+
+	Interval const_part = C;
+	const_part.sqrt_assign();
+
+	Interval intTwo(2);
+	Interval tmF_2c_remainder = (remainder / C) / intTwo;
+
+	result = tmF_2c_remainder;
+
+	Interval K(1), J(1);
+
+	for(int i=order, j=2*order-3; i>=2; --i, j-=2)
+	{
+		// i
+		Interval K((double)i);
+
+		// j = 2*i-3
+		Interval J((double)j);
+
+		result.inv_assign();
+		result *= J / K;
+
+		Interval intTemp;
+		intTemp = (*iterRange) * tmF_2c_remainder;	// P1 x I2
+		++iterRange;
+		intTemp += (*iterRange) * result;			// P2 x I1
+		intTemp += tmF_2c_remainder * result;		// I2 x I1
+		++iterRange;
+		intTemp += (*iterRange);					// truncation
+		++iterRange;
+
+		result = intTemp;
+	}
+
+	result *= const_part;
+
+	result += (*iterRange);		// cutoff error
+	++iterRange;
+
+	Interval rem, tmF_cRange;
+	tmF_cRange = (*iterRange);
+	++iterRange;
+
+	tmF_cRange += tmF_2c_remainder * intTwo;
+
+	sqrt_taylor_remainder(rem, tmF_cRange, order+1);
+
+	result += rem * const_part;
+}
+
+
+
+
+
+
+
+
+
+

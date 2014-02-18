@@ -12,6 +12,8 @@
 
 #include "include.h"
 
+extern mpfr_prec_t intervalNumPrecision;
+
 class Interval
 {
 private:
@@ -22,6 +24,7 @@ public:
 	Interval();
 	Interval(const double c);
 	Interval(const double l, const double u);
+	Interval(const char *strLo, const char *strUp);
 	Interval(const Interval & I);
 	~Interval();
 
@@ -34,7 +37,8 @@ public:
 	void setSup(const double u);
 	void setSup(const Interval & S);
 
-	void split(Interval & left, Interval & right) const;	// split the interval at the midpoint
+	void split(Interval & left, Interval & right) const;		// split the interval at the midpoint
+	void split(list<Interval> & result, const int n) const;		// split the interval uniformly by n parts
 
 	void set_inf();
 
@@ -97,15 +101,17 @@ public:
 	void mul_assign(const double c);
 	void div_assign(const double c);
 
-	Interval power(const unsigned int n) const;
+	Interval pow(const unsigned int n) const;
 	Interval exp() const;
 	Interval sin() const;
 	Interval cos() const;
+	Interval log() const;
 
-	void power_assign(const unsigned int n);
+	void pow_assign(const unsigned int n);
 	void exp_assign();
 	void sin_assign();
 	void cos_assign();
+	void log_assign();
 
 	double widthRatio(const Interval & I) const;
 
@@ -113,8 +119,5 @@ public:
 	void dump(FILE *fp) const;
 	void output(FILE *fp, const char * msg, const char * msg2) const;
 };
-
-void taylor_exp_remainder(Interval & result, const Interval & domain, const unsigned int order);
-void taylor_sin_remainder(Interval & result, const Interval & domain, const double center, const unsigned int order);
 
 #endif /* INTERVAL_H_ */

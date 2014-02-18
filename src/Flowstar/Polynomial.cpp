@@ -10,6 +10,10 @@
 #include "Polynomial.h"
 #include "TaylorModel.h"
 
+vector<Interval> factorial_rec;
+vector<Interval> power_4;
+vector<Interval> double_factorial;
+
 RangeTree::RangeTree()
 {
 }
@@ -151,6 +155,36 @@ void HornerForm::insert(TaylorModel & result, const TaylorModelVec & vars, const
 	}
 }
 
+void HornerForm::insert_normal(TaylorModel & result, const TaylorModelVec & vars, const vector<Interval> & varsPolyRange, const vector<Interval> & step_exp_table, const int numVars) const
+{
+	Interval intZero;
+
+	result.clear();
+
+	if(!constant.subseteq(intZero))
+	{
+		TaylorModel tmConstant(constant, numVars);
+		result = tmConstant;
+	}
+
+	if(hornerForms.size() > 0)						// the first variable is t
+	{
+		TaylorModel tmTemp;
+		hornerForms[0].insert_normal(tmTemp, vars, varsPolyRange, step_exp_table, numVars);
+
+		tmTemp.expansion.mul_assign(0,1);			// multiplied by t
+		tmTemp.remainder *= step_exp_table[1];
+		result.add_assign(tmTemp);
+
+		for(int i=1; i<hornerForms.size(); ++i)
+		{
+			hornerForms[i].insert_normal(tmTemp, vars, varsPolyRange, step_exp_table, numVars);	// recursive call
+			tmTemp.mul_insert_normal_assign(vars.tms[i-1], varsPolyRange[i-1], step_exp_table);
+			result.add_assign(tmTemp);
+		}
+	}
+}
+
 void HornerForm::insert_ctrunc(TaylorModel & result, const TaylorModelVec & vars, const vector<Interval> & varsPolyRange, const vector<Interval> & domain, const int order) const
 {
 	Interval intZero;
@@ -213,7 +247,7 @@ void HornerForm::insert_no_remainder(TaylorModel & result, const TaylorModelVec 
 	}
 }
 
-void HornerForm::insert_no_remainder_no_rounding(TaylorModel & result, const TaylorModelVec & vars, const int numVars, const int order) const
+void HornerForm::insert_no_remainder_no_cutoff(TaylorModel & result, const TaylorModelVec & vars, const int numVars, const int order) const
 {
 	Interval intZero;
 	result.clear();
@@ -235,8 +269,8 @@ void HornerForm::insert_no_remainder_no_rounding(TaylorModel & result, const Tay
 
 		for(int i=1; i<hornerForms.size(); ++i)
 		{
-			hornerForms[i].insert_no_remainder_no_rounding(tmTemp, vars, numVars, order);	// recursive call
-			tmTemp.mul_no_remainder_no_rounding_assign(vars.tms[i-1], order);
+			hornerForms[i].insert_no_remainder_no_cutoff(tmTemp, vars, numVars, order);	// recursive call
+			tmTemp.mul_no_remainder_no_cutoff_assign(vars.tms[i-1], order);
 			result.add_assign(tmTemp);
 		}
 	}
@@ -1230,7 +1264,7 @@ void Polynomial::derivative(Polynomial & result, const int varIndex) const
 
 void Polynomial::LieDerivative(Polynomial & result, const vector<Polynomial> & f) const
 {
-	derivative(result, 0);	
+	derivative(result, 0);
 
 	int rangeDim = f.size();
 
@@ -1331,7 +1365,7 @@ void Polynomial::rec_taylor(Polynomial & result, const int numVars, const int or
 		return;
 	}
 
-	Interval I(1), mI(-1);
+	Interval I(1);
 	Polynomial polyOne(I, numVars);
 	Polynomial F_c;
 	F.mul(F_c, const_part);
@@ -1343,7 +1377,7 @@ void Polynomial::rec_taylor(Polynomial & result, const int numVars, const int or
 
 	for(int i=order; i>0; --i)
 	{
-		result.mul_assign(mI);
+		result.inv_assign();
 
 		result *= F_c;
 		result.nctrunc(order);
@@ -1559,6 +1593,110 @@ void Polynomial::cos_taylor(Polynomial & result, const int numVars, const int or
 	result.cutoff();
 }
 
+void Polynomial::log_taylor(Polynomial & result, const int numVars, const int order) const
+{
+	Interval const_part;
+
+	Polynomial F = *this;
+
+	// remove the center point of tm
+	F.constant(const_part);
+	F.rmConstant();			// F = tm - c
+
+	Interval C = const_part;
+
+	const_part.log_assign();	// log(c)
+
+	if(F.isZero())			// tm = c
+	{
+		Polynomial polyLog(const_part, numVars);
+		result = polyLog;
+
+		return;
+	}
+
+	Polynomial F_c;
+	F.div(F_c, C);
+
+	result = F_c;
+
+	Interval I((double)order);
+	result.div_assign(I);			// F/c * (1/order)
+
+	for(int i=order; i>=2; --i)
+	{
+		Interval J(1);
+		J.div_assign((double)(i-1));
+		Polynomial polyJ(J, numVars);
+
+		result -= polyJ;
+		result.inv_assign();
+
+		result *= F_c;
+		result.nctrunc(order);
+		result.cutoff();
+	}
+
+	Polynomial const_part_poly(const_part, numVars);
+	result += const_part_poly;
+}
+
+void Polynomial::sqrt_taylor(Polynomial & result, const int numVars, const int order) const
+{
+	Interval const_part;
+
+	Polynomial F = *this;
+
+	// remove the center point of tm
+	F.constant(const_part);
+	F.rmConstant();			// F = tm - c
+
+	Interval C = const_part;
+	const_part.sqrt_assign();	// log(c)
+
+	if(F.isZero())			// tm = c
+	{
+		Polynomial polySqrt(const_part, numVars);
+		result = polySqrt;
+
+		return;
+	}
+
+	Polynomial F_2c;
+	F.div(F_2c, C);
+
+	Interval intTwo(2);
+	F_2c.div_assign(intTwo);	// F/2c
+
+	Interval intOne(1);
+	Polynomial polyOne(intOne, numVars);
+
+	result = F_2c;
+
+	Interval K(1), J(1);
+
+	for(int i=order, j=2*order-3; i>=2; --i, j-=2)
+	{
+		// i
+		Interval K((double)i);
+
+		// j = 2*i-3
+		Interval J((double)j);
+
+		result.inv_assign();
+		result.mul_assign( J / K );
+
+		result += polyOne;
+		result *= F_2c;
+		result.nctrunc(order);
+		result.cutoff();
+	}
+
+	result += polyOne;
+
+	result.mul_assign(const_part);
+}
+
 void Polynomial::toString(string & result, const vector<string> & varNames) const
 {
 	string strPoly;
@@ -1634,7 +1772,53 @@ void Polynomial::toString(string & result, const vector<string> & varNames) cons
 
 
 
+void compute_factorial_rec(const int order)
+{
+	Interval I(1);
 
+	factorial_rec.push_back(I);
+
+	for(int i=1; i<=order; ++i)
+	{
+		I.div_assign((double)i);
+		factorial_rec.push_back(I);
+	}
+}
+
+void compute_power_4(const int order)
+{
+	Interval I(1);
+
+	power_4.push_back(I);
+
+	for(int i=1; i<=order; ++i)
+	{
+		I.mul_assign(4.0);
+		power_4.push_back(I);
+	}
+}
+
+void compute_double_factorial(const int order)
+{
+	Interval odd(1), even(1);
+
+	double_factorial.push_back(even);
+	double_factorial.push_back(odd);
+
+	for(int i=2; i<=order; ++i)
+	{
+		if(i%2 == 0)
+		{
+			even.mul_assign((double)i);
+			double_factorial.push_back(even);
+		}
+		else
+		{
+			odd.mul_assign((double)i);
+			double_factorial.push_back(odd);
+		}
+	}
+}
 
 void computeTaylorExpansion(vector<HornerForm> & result, const vector<Polynomial> & ode, const int order)
 {
@@ -1651,29 +1835,28 @@ void computeTaylorExpansion(vector<HornerForm> & result, const vector<Polynomial
 		taylorExpansion.push_back(P);
 		LieDeriv_n.push_back(P);
 	}
-	
+
 	for(int i=0; i<rangeDim; ++i)
 	{
-		Interval intFactor(1);
-
 		for(int j=1; j<=order; ++j)
 		{
-			intFactor.div_assign((double)j);
 			Polynomial P1;
 			LieDeriv_n[i].LieDerivative(P1, ode);
 			LieDeriv_n[i] = P1;
 
-			P1.mul_assign(intFactor);
+			P1.mul_assign(factorial_rec[j]);
 			P1.mul_assign(0,j);
-	
+
 			taylorExpansion[i] += P1;
 		}
+
+		taylorExpansion[i].cutoff();
 	}
 
 	result.clear();
+
 	for(int i=0; i<taylorExpansion.size(); ++i)
 	{
-		taylorExpansion[i].cutoff();
 		HornerForm hf;
 		taylorExpansion[i].toHornerForm(hf);
 		result.push_back(hf);
@@ -1698,27 +1881,25 @@ void computeTaylorExpansion(vector<HornerForm> & result, const vector<Polynomial
 
 	for(int i=0; i<rangeDim; ++i)
 	{
-		Interval intFactor(1);
-
 		for(int j=1; j<=orders[i]; ++j)
 		{
-			intFactor.div_assign((double)j);
 			Polynomial P1;
 			LieDeriv_n[i].LieDerivative(P1, ode);
 			LieDeriv_n[i] = P1;
 
-			P1.mul_assign(intFactor);
+			P1.mul_assign(factorial_rec[j]);
 			P1.mul_assign(0,j);
 
 			taylorExpansion[i] += P1;
 		}
+
+		taylorExpansion[i].cutoff();
 	}
 
 	result.clear();
+
 	for(int i=0; i<taylorExpansion.size(); ++i)
 	{
-		taylorExpansion[i].cutoff();
-
 		HornerForm hf;
 		taylorExpansion[i].toHornerForm(hf);
 		result.push_back(hf);
@@ -1742,31 +1923,26 @@ void computeTaylorExpansion(vector<HornerForm> & resultHF, vector<Polynomial> & 
 	}
 
 	highest.clear();
+
 	for(int i=0; i<rangeDim; ++i)
 	{
-		Interval intFactor(1);
-
 		for(int j=1; j<=order; ++j)
 		{
-			intFactor.div_assign((double)j);
 			Polynomial P;
 			LieDeriv_n[i].LieDerivative(P, ode);
 			LieDeriv_n[i] = P;
-
-			P.mul_assign(intFactor);
-			P.mul_assign(0,j);
-
-			taylorExpansion[i] += P;
 
 			if(j == order)
 			{
 				highest.push_back(P);
 			}
-		}
-	}
 
-	for(int i=0; i<taylorExpansion.size(); ++i)
-	{
+			P.mul_assign(factorial_rec[j]);
+			P.mul_assign(0,j);
+
+			taylorExpansion[i] += P;
+		}
+
 		taylorExpansion[i].cutoff();
 	}
 
@@ -1798,31 +1974,26 @@ void computeTaylorExpansion(vector<HornerForm> & resultHF, vector<Polynomial> & 
 	}
 
 	highest.clear();
+
 	for(int i=0; i<rangeDim; ++i)
 	{
-		Interval intFactor(1);
-
 		for(int j=1; j<=orders[i]; ++j)
 		{
-			intFactor.div_assign((double)j);
 			Polynomial P;
 			LieDeriv_n[i].LieDerivative(P, ode);
 			LieDeriv_n[i] = P;
-
-			P.mul_assign(intFactor);
-			P.mul_assign(0,j);
-
-			taylorExpansion[i] += P;
 
 			if(j == orders[i])
 			{
 				highest.push_back(P);
 			}
-		}
-	}
 
-	for(int i=0; i<taylorExpansion.size(); ++i)
-	{
+			P.mul_assign(factorial_rec[j]);
+			P.mul_assign(0,j);
+
+			taylorExpansion[i] += P;
+		}
+
 		taylorExpansion[i].cutoff();
 	}
 
@@ -1844,20 +2015,19 @@ void increaseExpansionOrder(vector<HornerForm> & resultHF, vector<Polynomial> & 
 	vector<Polynomial> expansion = taylorExpansion;
 	vector<Polynomial> LieDeriv_n = highest;
 
-	Interval intFactor(1);
-	intFactor.div_assign((double)(order+1));
-
 	for(int i=0; i<rangeDim; ++i)
 	{
 		Polynomial P1;
 		LieDeriv_n[i].LieDerivative(P1, ode);
-		P1.mul_assign(intFactor);
-		P1.mul_assign(0, 1);
-
-		P1.cutoff();
 
 		highest[i] = P1;
+
+		P1.mul_assign(factorial_rec[order+1]);
+		P1.mul_assign(0, order+1);
+
 		expansion[i] += P1;
+
+		expansion[i].cutoff();
 	}
 
 	resultMF = expansion;
@@ -1878,19 +2048,21 @@ void increaseExpansionOrder(HornerForm & resultHF, Polynomial & resultMF, Polyno
 	Polynomial expansion = taylorExpansion;
 	Polynomial LieDeriv_n = highest;
 
-	Interval intFactor(1);
-	intFactor.div_assign((double)(order+1));
-
 	Polynomial P1;
 	LieDeriv_n.LieDerivative(P1, ode);
-	P1.mul_assign(intFactor);
-	P1.mul_assign(0, 1);
-
-	P1.cutoff();
 
 	highest = P1;
+
+	P1.mul_assign(factorial_rec[order+1]);
+	P1.mul_assign(0, order+1);
+
 	expansion += P1;
+	expansion.cutoff();
 
 	resultMF = expansion;
 	expansion.toHornerForm(resultHF);
 }
+
+
+
+

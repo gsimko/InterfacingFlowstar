@@ -14,6 +14,8 @@
 
 #include "Interval.h"
 
+mpfr_prec_t intervalNumPrecision = normal_precision;
+
 Interval::Interval()
 {
 	mpfr_inits2(intervalNumPrecision, lo, up, (mpfr_ptr) 0);
@@ -36,6 +38,14 @@ Interval::Interval(const double l, const double u)
 
 	mpfr_set_d(lo, l, MPFR_RNDD);
 	mpfr_set_d(up, u, MPFR_RNDU);
+}
+
+Interval::Interval(const char *strLo, const char *strUp)
+{
+	mpfr_inits2(intervalNumPrecision, lo, up, (mpfr_ptr) 0);
+
+	mpfr_set_str(lo, strLo, 10, MPFR_RNDD);
+	mpfr_set_str(up, strUp, 10, MPFR_RNDU);
 }
 
 Interval::Interval(const Interval & I)
@@ -98,6 +108,27 @@ void Interval::split(Interval & left, Interval & right) const
 	mpfr_div_d(right.lo, tmp, 2.0, MPFR_RNDD);
 
 	mpfr_clear(tmp);
+}
+
+void Interval::split(list<Interval> & result, const int n) const
+{
+	mpfr_t inc, w, newup, newlo;
+	mpfr_inits2(intervalNumPrecision, inc, w, newup, newlo, (mpfr_ptr) 0);
+
+	mpfr_sub(w, up, lo, MPFR_RNDU);
+	mpfr_div_si(inc, w, (long)n, MPFR_RNDU);
+
+	Interval grid;
+	mpfr_set(grid.lo, lo, MPFR_RNDD);
+	mpfr_add(grid.up, lo, inc, MPFR_RNDU);
+	result.push_back(grid);
+
+	for(int i=1; i<n; ++i)
+	{
+		mpfr_add(grid.lo, grid.lo, inc, MPFR_RNDD);
+		mpfr_add(grid.up, grid.up, inc, MPFR_RNDU);
+		result.push_back(grid);
+	}
 }
 
 void Interval::set_inf()
@@ -570,6 +601,12 @@ const Interval Interval::operator / (const Interval & I) const
 
 void Interval::sqrt(Interval & result) const
 {
+	if(mpfr_sgn(lo) < 0)
+	{
+		printf("Exception: Square root of a negative number.\n");
+		exit(1);
+	}
+
 	mpfr_sqrt(result.lo, lo, MPFR_RNDD);
 	mpfr_sqrt(result.up, up, MPFR_RNDU);
 }
@@ -584,7 +621,7 @@ void Interval::rec(Interval & result) const
 {
 	if (mpfr_sgn(lo) <= 0 && mpfr_sgn(up) >= 0)
 	{
-		printf("Divided by 0.\n");
+		printf("Exception: Divided by 0.\n");
 		exit(1);
 	}
 	else
@@ -602,6 +639,12 @@ void Interval::rec(Interval & result) const
 
 void Interval::sqrt_assign()
 {
+	if(mpfr_sgn(lo) < 0)
+	{
+		printf("Exception: Square root of a negative number.\n");
+		exit(1);
+	}
+
 	mpfr_sqrt(lo, lo, MPFR_RNDD);
 	mpfr_sqrt(up, up, MPFR_RNDU);
 }
@@ -668,14 +711,51 @@ void Interval::div_assign(const double c)
 	*this = result;
 }
 
-Interval Interval::power(const unsigned int n) const
+Interval Interval::pow(const unsigned int n) const
 {
-	Interval result(1);
-	for(int i=1; i<=n; ++i)
+	Interval result;
+
+	if(n % 2 == 1)		// n is odd
 	{
-		result *= *this;
+		mpfr_pow_ui(result.lo, lo, n, MPFR_RNDD);		// a = lo^n
+		mpfr_pow_ui(result.up, up, n, MPFR_RNDU);		// b = up^n
+	}
+	else				// n is even
+	{
+		if(mpfr_cmp_si(lo, 0L) >= 0)			// 0 <= lo <= up
+		{
+			mpfr_pow_ui(result.lo, lo, n, MPFR_RNDD);		// a = lo^n
+			mpfr_pow_ui(result.up, up, n, MPFR_RNDU);		// b = up^n
+		}
+		else if(mpfr_cmp_si(up, 0L) <= 0)		// lo <= up <= 0
+		{
+			mpfr_pow_ui(result.lo, up, n, MPFR_RNDD);		// a = up^n
+			mpfr_pow_ui(result.up, lo, n, MPFR_RNDU);		// b = lo^n
+		}
+		else									// lo < 0 < up
+		{
+			mpfr_t tmp1, tmp2;
+			mpfr_inits2(intervalNumPrecision, tmp1, tmp2, (mpfr_ptr) 0);
+
+			mpfr_pow_ui(tmp1, lo, n, MPFR_RNDU);
+			mpfr_pow_ui(tmp2, up, n, MPFR_RNDU);
+
+			// set b = max ( lo^n , up^n )
+			if(mpfr_cmp(tmp1, tmp2) >= 0)
+			{
+				mpfr_set(result.up, tmp1, MPFR_RNDU);
+			}
+			else
+			{
+				mpfr_set(result.up, tmp2, MPFR_RNDU);
+			}
+
+			mpfr_clear(tmp1);
+			mpfr_clear(tmp2);
+		}
 	}
 
+	// return [a,b]
 	return result;
 }
 
@@ -691,10 +771,25 @@ Interval Interval::exp() const
 
 Interval Interval::sin() const
 {
-	int iLo = (int)floor(2*inf()/PI_UP);
-	int iUp = (int)floor(2*sup()/PI_LO);
+	mpfr_t pi_up, pi_lo, tmp_up, tmp_lo;
+	mpfr_inits2(intervalNumPrecision, pi_up, pi_lo, tmp_up, tmp_lo, (mpfr_ptr) 0);
+	mpfr_set_str(pi_up, str_pi_up, 10, MPFR_RNDU);
+	mpfr_set_str(pi_lo, str_pi_lo, 10, MPFR_RNDD);
+
+	mpfr_div(tmp_up, up, pi_lo, MPFR_RNDU);
+	mpfr_div(tmp_lo, lo, pi_up, MPFR_RNDD);
+
+	mpfr_mul_si(tmp_up, tmp_up, 2, MPFR_RNDU);
+	mpfr_mul_si(tmp_lo, tmp_lo, 2, MPFR_RNDD);
+
+	mpfr_floor(tmp_up, tmp_up);
+	mpfr_floor(tmp_lo, tmp_lo);
+
+	int iUp = (int) mpfr_get_si(tmp_up, MPFR_RNDN);
+	int iLo = (int) mpfr_get_si(tmp_lo, MPFR_RNDN);
 
 	int iPeriod = iUp - iLo;
+
 	if(iPeriod >= 4)
 	{
 		Interval result(-1,1);
@@ -886,10 +981,25 @@ Interval Interval::sin() const
 
 Interval Interval::cos() const
 {
-	int iLo = (int)floor(2*inf()/PI_UP);
-	int iUp = (int)floor(2*sup()/PI_LO);
+	mpfr_t pi_up, pi_lo, tmp_up, tmp_lo;
+	mpfr_inits2(intervalNumPrecision, pi_up, pi_lo, tmp_up, tmp_lo, (mpfr_ptr) 0);
+	mpfr_set_str(pi_up, str_pi_up, 10, MPFR_RNDU);
+	mpfr_set_str(pi_lo, str_pi_lo, 10, MPFR_RNDD);
+
+	mpfr_div(tmp_up, up, pi_lo, MPFR_RNDU);
+	mpfr_div(tmp_lo, lo, pi_up, MPFR_RNDD);
+
+	mpfr_mul_si(tmp_up, tmp_up, 2, MPFR_RNDU);
+	mpfr_mul_si(tmp_lo, tmp_lo, 2, MPFR_RNDD);
+
+	mpfr_floor(tmp_up, tmp_up);
+	mpfr_floor(tmp_lo, tmp_lo);
+
+	int iUp = (int) mpfr_get_si(tmp_up, MPFR_RNDN);
+	int iLo = (int) mpfr_get_si(tmp_lo, MPFR_RNDN);
 
 	int iPeriod = iUp - iLo;
+
 	if(iPeriod >= 4)
 	{
 		Interval result(-1,1);
@@ -1079,15 +1189,68 @@ Interval Interval::cos() const
 	}
 }
 
-void Interval::power_assign(const unsigned int n)
+Interval Interval::log() const
 {
-	Interval result(1);
-	for(int i=1; i<=n; ++i)
+	if(mpfr_sgn(lo) <= 0)
 	{
-		result *= *this;
+		printf("Exception: Logarithm of a non-positive number.\n");
+		exit(1);
+	}
+	else
+	{
+		Interval result;
+		mpfr_log(result.lo, lo, MPFR_RNDD);
+		mpfr_log(result.up, up, MPFR_RNDU);
+		return result;
+	}
+}
+
+void Interval::pow_assign(const unsigned int n)
+{
+	mpfr_t tmp1, tmp2;
+	mpfr_inits2(intervalNumPrecision, tmp1, tmp2, (mpfr_ptr) 0);
+
+	if(n % 2 == 1)		// n is odd
+	{
+		mpfr_pow_ui(lo, lo, n, MPFR_RNDD);		// a = lo^n
+		mpfr_pow_ui(up, up, n, MPFR_RNDU);		// b = up^n
+	}
+	else				// n is even
+	{
+		if(mpfr_cmp_si(lo, 0L) >= 0)			// 0 <= lo <= up
+		{
+			mpfr_pow_ui(lo, lo, n, MPFR_RNDD);		// a = lo^n
+			mpfr_pow_ui(up, up, n, MPFR_RNDU);		// b = up^n
+		}
+		else if(mpfr_cmp_si(up, 0L) <= 0)		// lo <= up <= 0
+		{
+			mpfr_pow_ui(tmp1, up, n, MPFR_RNDD);		// a = up^n
+			mpfr_pow_ui(tmp2, lo, n, MPFR_RNDU);		// b = lo^n
+
+			mpfr_set(lo, tmp1, MPFR_RNDD);
+			mpfr_set(up, tmp2, MPFR_RNDU);
+		}
+		else									// lo < 0 < up
+		{
+			mpfr_pow_ui(tmp1, lo, n, MPFR_RNDU);
+			mpfr_pow_ui(tmp2, up, n, MPFR_RNDU);
+
+			// set b = max ( lo^n , up^n )
+			if(mpfr_cmp(tmp1, tmp2) >= 0)
+			{
+				mpfr_set(up, tmp1, MPFR_RNDU);
+			}
+			else
+			{
+				mpfr_set(up, tmp2, MPFR_RNDU);
+			}
+
+			mpfr_set_si(lo, 0L, MPFR_RNDD);
+		}
 	}
 
-	*this = result;
+	mpfr_clear(tmp1);
+	mpfr_clear(tmp2);
 }
 
 void Interval::exp_assign()
@@ -1098,10 +1261,25 @@ void Interval::exp_assign()
 
 void Interval::sin_assign()
 {
-	int iLo = (int)floor(2*inf()/PI_UP);
-	int iUp = (int)floor(2*sup()/PI_LO);
+	mpfr_t pi_up, pi_lo, tmp_up, tmp_lo;
+	mpfr_inits2(intervalNumPrecision, pi_up, pi_lo, tmp_up, tmp_lo, (mpfr_ptr) 0);
+	mpfr_set_str(pi_up, str_pi_up, 10, MPFR_RNDU);
+	mpfr_set_str(pi_lo, str_pi_lo, 10, MPFR_RNDD);
+
+	mpfr_div(tmp_up, up, pi_lo, MPFR_RNDU);
+	mpfr_div(tmp_lo, lo, pi_up, MPFR_RNDD);
+
+	mpfr_mul_si(tmp_up, tmp_up, 2, MPFR_RNDU);
+	mpfr_mul_si(tmp_lo, tmp_lo, 2, MPFR_RNDD);
+
+	mpfr_floor(tmp_up, tmp_up);
+	mpfr_floor(tmp_lo, tmp_lo);
+
+	int iUp = (int) mpfr_get_si(tmp_up, MPFR_RNDN);
+	int iLo = (int) mpfr_get_si(tmp_lo, MPFR_RNDN);
 
 	int iPeriod = iUp - iLo;
+
 	if(iPeriod >= 4)
 	{
 		mpfr_set_d(lo, -1, MPFR_RNDD);
@@ -1293,10 +1471,25 @@ void Interval::sin_assign()
 
 void Interval::cos_assign()
 {
-	int iLo = (int)floor(2*inf()/PI_UP);
-	int iUp = (int)floor(2*sup()/PI_LO);
+	mpfr_t pi_up, pi_lo, tmp_up, tmp_lo;
+	mpfr_inits2(intervalNumPrecision, pi_up, pi_lo, tmp_up, tmp_lo, (mpfr_ptr) 0);
+	mpfr_set_str(pi_up, str_pi_up, 10, MPFR_RNDU);
+	mpfr_set_str(pi_lo, str_pi_lo, 10, MPFR_RNDD);
+
+	mpfr_div(tmp_up, up, pi_lo, MPFR_RNDU);
+	mpfr_div(tmp_lo, lo, pi_up, MPFR_RNDD);
+
+	mpfr_mul_si(tmp_up, tmp_up, 2, MPFR_RNDU);
+	mpfr_mul_si(tmp_lo, tmp_lo, 2, MPFR_RNDD);
+
+	mpfr_floor(tmp_up, tmp_up);
+	mpfr_floor(tmp_lo, tmp_lo);
+
+	int iUp = (int) mpfr_get_si(tmp_up, MPFR_RNDN);
+	int iLo = (int) mpfr_get_si(tmp_lo, MPFR_RNDN);
 
 	int iPeriod = iUp - iLo;
+
 	if(iPeriod >= 4)
 	{
 		mpfr_set_d(lo, -1, MPFR_RNDD);
@@ -1486,6 +1679,20 @@ void Interval::cos_assign()
 	}
 }
 
+void Interval::log_assign()
+{
+	if(mpfr_sgn(lo) <= 0)
+	{
+		printf("Exception: Logarithm of a non-positive number.\n");
+		exit(1);
+	}
+	else
+	{
+		mpfr_log(lo, lo, MPFR_RNDD);
+		mpfr_log(up, up, MPFR_RNDU);
+	}
+}
+
 double Interval::widthRatio(const Interval & I) const
 {
 	mpfr_t width1, width2, ratio;
@@ -1546,25 +1753,3 @@ void Interval::output(FILE * fp, const char * msg, const char * msg2) const
 	fprintf(fp, " ] %s", msg2);
 }
 
-void taylor_exp_remainder(Interval & result, const Interval & domain, const unsigned int order)
-{
-	Interval I1(0,1), I2(1), I3(1);
-
-	for(int i=1; i<=order+1; ++i)
-	{
-		I2.div_assign(i);
-		I3 *= domain;
-	}
-
-	I1 *= domain;
-	I1.exp_assign();
-
-	result = I2;
-	result *= I3;
-	result *= I1;
-}
-
-void taylor_sin_remainder(Interval & result, const Interval & domain, const double center, const unsigned int order)
-{
-
-}

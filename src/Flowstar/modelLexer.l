@@ -20,6 +20,7 @@ letter [a-zA-Z_]
 ident {letter}({letter}|{digit}|".")*
 number ("-"?)(({digit}+)|({digit}*"."{digit}*)|({digit}+"e"(({digit}+)|("-"{digit}+)))|({digit}*"."{digit}*"e"(({digit}+)|("-"{digit}+)))|({digit}*"."{digit}*"e"("+"({digit}+)|("-"{digit}+))))
 
+
 %%
 "\'" { return '\'';}
 "+" {return '+';}
@@ -40,6 +41,7 @@ number ("-"?)(({digit}+)|({digit}*"."{digit}*)|({digit}+"e"(({digit}+)|("-"{digi
 ":=" {return ASSIGN;}
 "^" {return '^';}
 "/" {return '/';}
+">" {return '>';}
 "mode" {return MODE;}
 "init" {return INIT;}
 "in" {return BELONGSTO;}
@@ -47,9 +49,9 @@ number ("-"?)(({digit}+)|({digit}*"."{digit}*)|({digit}+"e"(({digit}+)|("-"{digi
 "poly ode 2" {return POLYODE2;}
 "visualize" {return VISUALIZE;}
 "end" {return END;}
-"settings" {return SETTINGS;}
-"continuous system" {return CONTINUOUS;}
-"hybrid system" {return HYBRID;}
+"setting" {return SETTING;}
+"continuous reachability" {return CONTINUOUS;}
+"hybrid reachability" {return HYBRID;}
 "fixed steps" {return FIXEDST;}
 "adaptive steps" {return ADAPTIVEST;}
 "fixed orders" {return FIXEDORD;}
@@ -88,8 +90,14 @@ number ("-"?)(({digit}+)|({digit}*"."{digit}*)|({digit}+"e"(({digit}+)|("-"{digi
 "exp" {return EXP;}
 "sin" {return SIN;}
 "cos" {return COS;}
-"nonpoly ode" {return NPODE;}
+"log" {return LOG;}
+"sqrt" {return SQRT;}
+"nonpoly ode" {return NPODE_TAYLOR;}
 "cutoff" {return CUTOFF;}
+"precision" {return PRECISION;}
+"gnuplot" {return GNUPLOT;}
+"matlab" {return MATLAB;}
+"computation paths" {return COMPUTATIONPATHS;}
 
 
 {number} { yylval.dblVal = atof( (char *)yytext ); return NUM; }

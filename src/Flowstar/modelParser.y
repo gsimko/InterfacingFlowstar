@@ -4,16 +4,22 @@
   	Authors: Xin Chen, Erika Abraham and Sriram Sankaranarayanan.
   	Email: Xin Chen <xin.chen@cs.rwth-aachen.de> if you have questions or comments.
   
+  	Modification: Added mkdir macro to fix MinGW's lack of mkdir.
+  	Author: Gabor Simko	
+  	Date: 2/7/2014.
+  
   	The code is released as is under the GNU General Public License (GPL). Please consult the file LICENSE.txt for
   	further information.
   	---*/
-    
+
+
 	#include "modelParser.h"
 
 	#if defined(_WIN32)
 		#include <io.h>
-		#define mkdir(A) _mkdir(A)
+		#define mkdir(A,B) _mkdir(A)
 	#endif
+
 	
 	extern int yyerror(const char *);
 	extern int yyerror(string);
@@ -42,6 +48,7 @@
 	TaylorModel *ptm;
 	Interval *pint;
 	vector<string> *strVec;
+	TreeNode *pNode;
 }
 
 
@@ -53,7 +60,7 @@
 %token VISUALIZE PARAAGGREG INTAGGREG TMAGGREG
 %token OUTPUT
 %token CONTINUOUS HYBRID
-%token SETTINGS
+%token SETTING
 %token FIXEDST FIXEDORD ADAPTIVEST ADAPTIVEORD
 %token MIN MAX
 %token REMEST
@@ -64,8 +71,10 @@
 %token PRINTON PRINTOFF UNSAFESET
 %token CONTINUOUSFLOW HYBRIDFLOW
 %token TAYLOR_PICARD TAYLOR_REMAINDER TAYLOR_POLYNOMIAL
-%token EXP SIN COS
-%token NPODE CUTOFF
+%token EXP SIN COS LOG SQRT
+%token NPODE_TAYLOR CUTOFF PRECISION
+%token GNUPLOT MATLAB COMPUTATIONPATHS
+
 
 %type <poly> polynomial
 %type <poly> ODEpolynomial
@@ -88,6 +97,8 @@
 %type <poly> non_polynomial_rhs_no_remainder
 %type <identifier> non_polynomial_rhs_string
 %type <strVec> npode
+%type <pNode> computation_path
+
 
 %left GEQ LEQ EQ 
 %left '+' '-'
@@ -101,14 +112,14 @@
 
 model: CONTINUOUS '{' continuous '}'
 {
-	int mkres = mkdir(outputDir);
+	int mkres = mkdir(outputDir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 	if(mkres < 0 && errno != EEXIST)
 	{
 		printf("Can not create the directory for output files.\n");
 		exit(1);
 	}
 
-	mkres = mkdir(imageDir);
+	mkres = mkdir(imageDir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 	if(mkres < 0 && errno != EEXIST)
 	{
 		printf("Can not create the directory for images.\n");
@@ -128,22 +139,9 @@ model: CONTINUOUS '{' continuous '}'
 	continuousProblem.composition();
 	printf("Done.\n");
 
+	continuousProblem.plot_2D();
+
 	char filename[NAME_SIZE+10];
-	sprintf(filename, "%s%s.plt", outputDir, continuousProblem.outputFileName);
-	FILE *fpPlotting = fopen(filename, "w");
-	
-	if(fpPlotting == NULL)
-	{
-		printf("Can not create the plotting file.\n");
-		exit(1);
-	}
-
-	printf("Generating the plotting file...\n");
-	continuousProblem.output_2D_GNUPLOT(fpPlotting);
-	printf("Done.\n");
-	
-	fclose(fpPlotting);
-
 	sprintf(filename, "%s%s.flow", outputDir, continuousProblem.outputFileName);
 	FILE *fpDumping = fopen(filename, "w");
 
@@ -162,14 +160,14 @@ model: CONTINUOUS '{' continuous '}'
 |
 CONTINUOUS '{' continuous '}' unsafe_continuous
 {
-	int mkres = mkdir(outputDir);
+	int mkres = mkdir(outputDir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 	if(mkres < 0 && errno != EEXIST)
 	{
 		printf("Can not create the directory for output files.\n");
 		exit(1);
 	}
 
-	mkres = mkdir(imageDir);
+	mkres = mkdir(imageDir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 	if(mkres < 0 && errno != EEXIST)
 	{
 		printf("Can not create the directory for images.\n");
@@ -189,22 +187,9 @@ CONTINUOUS '{' continuous '}' unsafe_continuous
 	continuousProblem.composition();
 	printf("Done.\n");
 
+	continuousProblem.plot_2D();
+
 	char filename[NAME_SIZE+10];
-	sprintf(filename, "%s%s.plt", outputDir, continuousProblem.outputFileName);
-	FILE *fpPlotting = fopen(filename, "w");
-	
-	if(fpPlotting == NULL)
-	{
-		printf("Can not create the plotting file.\n");
-		exit(1);
-	}
-
-	printf("Generating the plotting file...\n");
-	continuousProblem.output_2D_GNUPLOT(fpPlotting);
-	printf("Done.\n");
-
-	fclose(fpPlotting);
-
 	sprintf(filename, "%s%s.flow", outputDir, continuousProblem.outputFileName);
 	FILE *fpDumping = fopen(filename, "w");
 
@@ -245,14 +230,14 @@ CONTINUOUS '{' continuous '}' unsafe_continuous
 |
 HYBRID '{' hybrid '}'
 {
-	int mkres = mkdir(outputDir);
+	int mkres = mkdir(outputDir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 	if(mkres < 0 && errno != EEXIST)
 	{
 		printf("Can not create the directory for output files.\n");
 		exit(1);
 	}
 
-	mkres = mkdir(imageDir);
+	mkres = mkdir(imageDir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 	if(mkres < 0 && errno != EEXIST)
 	{
 		printf("Can not create the directory for images.\n");
@@ -271,22 +256,9 @@ HYBRID '{' hybrid '}'
 	printf("Preparing for plotting and dumping...\n");
 	printf("Done.\n");
 
+	hybridProblem.plot_2D();
+
 	char filename[NAME_SIZE+10];
-	sprintf(filename, "%s%s.plt", outputDir, hybridProblem.outputFileName);
-	FILE *fpPlotting = fopen(filename, "w");
-	
-	if(fpPlotting == NULL)
-	{
-		printf("Can not create the plotting file.\n");
-		exit(1);
-	}
-
-	printf("Generating the plotting file...\n");
-	hybridProblem.output_2D_GNUPLOT(fpPlotting);
-	printf("Done.\n");
-	
-	fclose(fpPlotting);
-
 	sprintf(filename, "%s%s.flow", outputDir, hybridProblem.outputFileName);
 	FILE *fpDumping = fopen(filename, "w");
 
@@ -295,7 +267,7 @@ HYBRID '{' hybrid '}'
 		printf("Can not create the dumping file.\n");
 		exit(1);
 	}
-	
+
 	printf("Dumping the Taylor model flowpipes...\n");
 	hybridProblem.dump(fpDumping);
 	printf("Done.\n");
@@ -305,14 +277,14 @@ HYBRID '{' hybrid '}'
 |
 HYBRID '{' hybrid '}' unsafe_hybrid
 {
-	int mkres = mkdir(outputDir);
+	int mkres = mkdir(outputDir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 	if(mkres < 0 && errno != EEXIST)
 	{
 		printf("Can not create the directory for output files.\n");
 		exit(1);
 	}
 
-	mkres = mkdir(imageDir);
+	mkres = mkdir(imageDir, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 	if(mkres < 0 && errno != EEXIST)
 	{
 		printf("Can not create the directory for images.\n");
@@ -331,22 +303,9 @@ HYBRID '{' hybrid '}' unsafe_hybrid
 	printf("Preparing for plotting and dumping...\n");
 	printf("Done.\n");
 
+	hybridProblem.plot_2D();
+
 	char filename[NAME_SIZE+10];
-	sprintf(filename, "%s%s.plt", outputDir, hybridProblem.outputFileName);
-	FILE *fpPlotting = fopen(filename, "w");
-	
-	if(fpPlotting == NULL)
-	{
-		printf("Can not create the plotting file.\n");
-		exit(1);
-	}
-
-	printf("Generating the plotting file...\n");
-	hybridProblem.output_2D_GNUPLOT(fpPlotting);
-	printf("Done.\n");
-	
-	fclose(fpPlotting);
-
 	sprintf(filename, "%s%s.flow", outputDir, hybridProblem.outputFileName);
 	FILE *fpDumping = fopen(filename, "w");
 
@@ -388,22 +347,9 @@ HYBRID '{' hybrid '}' unsafe_hybrid
 stateVarDecls plotting OUTPUT IDENT unsafe_continuous CONTINUOUSFLOW '{' tmVarDecls continuous_flowpipes '}'
 {
 	clock_t begin, end;
-	char filename[NAME_SIZE+10];
 	strcpy(continuousProblem.outputFileName, $4->c_str());
-	sprintf(filename, "%s%s.plt", outputDir, $4->c_str());
-	FILE *fpPlotting = fopen(filename, "w");
 
-	if(fpPlotting == NULL)
-	{
-		printf("Can not create the plotting file.\n");
-		exit(1);
-	}
-
-	printf("Generating the plotting file...\n");
-	continuousProblem.output_2D_GNUPLOT(fpPlotting);
-	printf("Done.\n");
-	
-	fclose(fpPlotting);
+	continuousProblem.plot_2D();
 
 	int checkingResult;
 	printf("Safety checking ...\n");
@@ -430,43 +376,17 @@ stateVarDecls plotting OUTPUT IDENT unsafe_continuous CONTINUOUSFLOW '{' tmVarDe
 |
 stateVarDecls plotting OUTPUT IDENT CONTINUOUSFLOW '{' tmVarDecls continuous_flowpipes '}'
 {
-	char filename[NAME_SIZE+10];
 	strcpy(continuousProblem.outputFileName, $4->c_str());
-	sprintf(filename, "%s%s.plt", outputDir, $4->c_str());
-	FILE *fpPlotting = fopen(filename, "w");
-
-	if(fpPlotting == NULL)
-	{
-		printf("Can not create the plotting file.\n");
-		exit(1);
-	}
-
-	printf("Generating the plotting file...\n");
-	continuousProblem.output_2D_GNUPLOT(fpPlotting);
-	printf("Done.\n");
-	
-	fclose(fpPlotting);
+	continuousProblem.plot_2D();
 }
 |
-stateVarDecls modeDecls plotting OUTPUT IDENT unsafe_hybrid HYBRIDFLOW '{' hybrid_flowpipes '}'
+stateVarDecls modeDecls COMPUTATIONPATHS '{' computation_paths '}' plotting OUTPUT IDENT unsafe_hybrid HYBRIDFLOW '{' hybrid_flowpipes '}'
 {
 	clock_t begin, end;
-	char filename[NAME_SIZE+10];
-	strcpy(hybridProblem.outputFileName, $5->c_str());
-	sprintf(filename, "%s%s.plt", outputDir, $5->c_str());
-	FILE *fpPlotting = fopen(filename, "w");
+	strcpy(hybridProblem.outputFileName, $9->c_str());
+	generateNodeSeq(hybridProblem.traceNodes, hybridProblem.traceTree);
 
-	if(fpPlotting == NULL)
-	{
-		printf("Can not create the plotting file.\n");
-		exit(1);
-	}
-
-	printf("Generating the plotting file...\n");
-	hybridProblem.output_2D_GNUPLOT(fpPlotting);
-	printf("Done.\n");
-	
-	fclose(fpPlotting);
+	hybridProblem.plot_2D();
 
 	int checkingResult;
 	printf("Safety checking ...\n");
@@ -489,26 +409,17 @@ stateVarDecls modeDecls plotting OUTPUT IDENT unsafe_hybrid HYBRIDFLOW '{' hybri
 		printf("UNKNOWN\n");
 		break;
 	}
+
+	delete $9;
 }
 |
-stateVarDecls modeDecls plotting OUTPUT IDENT HYBRIDFLOW '{' hybrid_flowpipes '}'
+stateVarDecls modeDecls COMPUTATIONPATHS '{' computation_paths '}' plotting OUTPUT IDENT HYBRIDFLOW '{' hybrid_flowpipes '}'
 {
-	char filename[NAME_SIZE+10];
-	strcpy(hybridProblem.outputFileName, $5->c_str());
-	sprintf(filename, "%s%s.plt", outputDir, $5->c_str());
-	FILE *fpPlotting = fopen(filename, "w");
+	strcpy(hybridProblem.outputFileName, $9->c_str());
+	generateNodeSeq(hybridProblem.traceNodes, hybridProblem.traceTree);
+	hybridProblem.plot_2D();
 
-	if(fpPlotting == NULL)
-	{
-		printf("Can not create the plotting file.\n");
-		exit(1);
-	}
-
-	printf("Generating the plotting file...\n");
-	hybridProblem.output_2D_GNUPLOT(fpPlotting);
-	printf("Done.\n");
-	
-	fclose(fpPlotting);
+	delete $9;
 }
 |
 TAYLOR_PICARD '{' non_polynomial_rhs_picard '}'
@@ -611,6 +522,84 @@ IDENT '{' tmVarDecls continuous_flowpipes '}'
 	continuousProblem.domains.clear();
 	continuousProblem.tmVarTab.clear();
 	continuousProblem.tmVarNames.clear();
+}
+;
+
+computation_paths: computation_paths computation_path ';'
+{
+}
+|
+computation_path ';'
+{
+}
+;
+
+computation_path: computation_path '(' NUM ',' '[' NUM ',' NUM ']' ')' '-' '>' IDENT
+{
+	int id = hybridProblem.getIDForMode(*$13);
+	if(id < 0)
+	{
+		char errMsg[MSG_SIZE];
+		sprintf(errMsg, "Mode %s has not been declared.", (*$13).c_str());
+		parseError(errMsg, lineNum);
+		exit(1);
+	}
+
+	list<TreeNode *>::iterator iter = $$->children.begin();
+	bool found = false;
+	for(; iter!=$$->children.end(); ++iter)
+	{
+		if((*iter)->jumpID == $3 && (*iter)->modeID == id)
+		{
+			$$ = *iter;
+			found = true;
+			break;
+		}
+	}
+
+	if(!found)
+	{
+		Interval I($6, $8);
+		TreeNode *tmp = new TreeNode((int)$3, id, I);
+		tmp->parent = $$;
+		$$->children.push_back(tmp);
+		$$ = tmp;
+	}
+
+	delete $13;
+}
+|
+IDENT
+{
+	int id = hybridProblem.getIDForMode(*$1);
+	if(id < 0)
+	{
+		char errMsg[MSG_SIZE];
+		sprintf(errMsg, "Mode %s has not been declared.", (*$1).c_str());
+		parseError(errMsg, lineNum);
+		exit(1);
+	}
+
+	if(hybridProblem.traceTree == NULL)
+	{
+		Interval intZero;
+		hybridProblem.traceTree = new TreeNode(0, id, intZero);
+		$$ = hybridProblem.traceTree;
+	}
+	else
+	{
+		if(hybridProblem.traceTree->modeID == id)
+		{
+			$$ = hybridProblem.traceTree;
+		}
+		else
+		{
+			parseError("Invalid computation path.", lineNum);
+			exit(1);
+		}
+	}
+
+	delete $1;
 }
 ;
 
@@ -746,9 +735,9 @@ polynomial_constraints ODEpolynomial BELONGSTO '[' NUM ',' NUM ']'
 }
 ;
 
-continuous: stateVarDecls SETTINGS '{' settings print '}' INIT '{' init '}' POLYODE1 '{' ode '}'
+continuous: stateVarDecls SETTING '{' settings print '}' POLYODE1 '{' ode '}' INIT '{' init '}'
 {
-	ContinuousSystem system(*$13, gUncertainties, *$9);
+	ContinuousSystem system(*$9, gUncertainties, *$13);
 	continuousProblem.system = system;
 	continuousProblem.integrationScheme = LOW_DEGREE;
 
@@ -756,9 +745,9 @@ continuous: stateVarDecls SETTINGS '{' settings print '}' INIT '{' init '}' POLY
 	delete $13;
 }
 |
-stateVarDecls SETTINGS '{' settings print '}' INIT '{' init '}' POLYODE2 '{' ode '}'
+stateVarDecls SETTING '{' settings print '}' POLYODE2 '{' ode '}' INIT '{' init '}'
 {
-	ContinuousSystem system(*$13, gUncertainties, *$9);
+	ContinuousSystem system(*$9, gUncertainties, *$13);
 	continuousProblem.system = system;
 	continuousProblem.integrationScheme = HIGH_DEGREE;
 
@@ -766,24 +755,25 @@ stateVarDecls SETTINGS '{' settings print '}' INIT '{' init '}' POLYODE2 '{' ode
 	delete $13;
 }
 |
-stateVarDecls SETTINGS '{' settings print '}' INIT '{' init '}' NPODE '{' npode '}'
+stateVarDecls SETTING '{' settings print '}' NPODE_TAYLOR '{' npode '}' INIT '{' init '}'
 {
-	ContinuousSystem system(*$13, gUncertainties, *$9);
+	ContinuousSystem system(*$9, gUncertainties, *$13);
 	continuousProblem.system = system;
-	continuousProblem.integrationScheme = NON_POLY;
+	continuousProblem.integrationScheme = NONPOLY_TAYLOR;
 
 	delete $9;
 	delete $13;
 }
 ;
 
-hybrid: stateVarDecls SETTINGS '{' settings MAXJMPS NUM print '}' MODES '{' modes '}' JUMPS '{' jumps '}' INIT '{' hybrid_init '}'
+hybrid: stateVarDecls SETTING '{' settings MAXJMPS NUM print '}' MODES '{' modes '}' JUMPS '{' jumps '}' INIT '{' hybrid_init '}'
 {
 	if($6 < 0)
 	{
 		parseError("The maximum jump depth should be a nonnegative integer.", lineNum);
 		exit(1);
 	}
+
 	hybridProblem.maxJumps = (int)$6;
 }
 ;
@@ -809,9 +799,12 @@ hybrid_init: IDENT '{' intervals '}'
 	hybridProblem.declareTMVar(tVar);
 	continuousProblem.declareTMVar(tVar);
 
+	char name[NAME_SIZE];
+
 	for(int i=0; i<numVars; ++i)
 	{
-		string tmVarName = hybridProblem.stateVarNames[i] + "0";
+		sprintf(name, "%s%d", local_var_name, i+1);
+		string tmVarName(name);
 		hybridProblem.declareTMVar(tmVarName);
 		continuousProblem.declareTMVar(tmVarName);
 	}
@@ -875,18 +868,18 @@ IDENT '{' POLYODE2 '{' ode '}' INV '{' polynomial_constraints '}' '}'
 	delete $9;
 }
 |
-modes IDENT '{' NPODE '{' npode '}' INV '{' polynomial_constraints '}' '}'
+modes IDENT '{' NPODE_TAYLOR '{' npode '}' INV '{' polynomial_constraints '}' '}'
 {
-	hybridProblem.declareMode(*$2, *$6, gUncertainties, *$10, NON_POLY);
+	hybridProblem.declareMode(*$2, *$6, gUncertainties, *$10, NONPOLY_TAYLOR);
 
 	delete $2;
 	delete $6;
 	delete $10;
 }
 |
-IDENT '{' NPODE '{' npode '}' INV '{' polynomial_constraints '}' '}'
+IDENT '{' NPODE_TAYLOR '{' npode '}' INV '{' polynomial_constraints '}' '}'
 {
-	hybridProblem.declareMode(*$1, *$5, gUncertainties, *$9, NON_POLY);
+	hybridProblem.declareMode(*$1, *$5, gUncertainties, *$9, NONPOLY_TAYLOR);
 
 	delete $1;
 	delete $5;
@@ -894,13 +887,13 @@ IDENT '{' NPODE '{' npode '}' INV '{' polynomial_constraints '}' '}'
 }
 ;
 
-jumps: jumps START IDENT END IDENT GUARD '{' polynomial_constraints '}' RESET '{' reset '}' PARAAGGREG '{' real_valued_vectors '}'
+jumps: jumps IDENT '-' '>' IDENT GUARD '{' polynomial_constraints '}' RESET '{' reset '}' PARAAGGREG '{' real_valued_vectors '}'
 {
-	int startID = hybridProblem.getIDForMode(*$3);
+	int startID = hybridProblem.getIDForMode(*$2);
 	if(startID < 0)
 	{
 		char errMsg[MSG_SIZE];
-		sprintf(errMsg, "Mode %s has not been declared.", (*$3).c_str());
+		sprintf(errMsg, "Mode %s has not been declared.", (*$2).c_str());
 		parseError(errMsg, lineNum);
 		exit(1);
 	}
@@ -925,13 +918,13 @@ jumps: jumps START IDENT END IDENT GUARD '{' polynomial_constraints '}' RESET '{
 	}
 }
 |
-jumps START IDENT END IDENT GUARD '{' polynomial_constraints '}' RESET '{' reset '}' INTAGGREG
+jumps IDENT '-' '>' IDENT GUARD '{' polynomial_constraints '}' RESET '{' reset '}' INTAGGREG
 {
-	int startID = hybridProblem.getIDForMode(*$3);
+	int startID = hybridProblem.getIDForMode(*$2);
 	if(startID < 0)
 	{
 		char errMsg[MSG_SIZE];
-		sprintf(errMsg, "Mode %s has not been declared.", (*$3).c_str());
+		sprintf(errMsg, "Mode %s has not been declared.", (*$2).c_str());
 		parseError(errMsg, lineNum);
 		exit(1);
 	}
@@ -1141,7 +1134,7 @@ IDENT
 }
 ;
 
-settings: FIXEDST NUM TIME NUM remainder_estimation precondition plotting FIXEDORD NUM CUTOFF NUM OUTPUT IDENT
+settings: FIXEDST NUM TIME NUM remainder_estimation precondition plotting FIXEDORD NUM CUTOFF NUM PRECISION NUM OUTPUT IDENT
 {
 	int order = (int)$9;
 
@@ -1174,14 +1167,15 @@ settings: FIXEDST NUM TIME NUM remainder_estimation precondition plotting FIXEDO
 	}
 
 	cutoff_threshold = $11;
+	intervalNumPrecision = (int)$13;
 
-	strcpy(continuousProblem.outputFileName, (*$13).c_str());
-	strcpy(hybridProblem.outputFileName, (*$13).c_str());
+	strcpy(continuousProblem.outputFileName, (*$15).c_str());
+	strcpy(hybridProblem.outputFileName, (*$15).c_str());
 
-	delete $13;
+	delete $15;
 }
 |
-FIXEDST NUM TIME NUM remainder_estimation precondition plotting ADAPTIVEORD '{' MIN NUM ',' MAX NUM '}' CUTOFF NUM OUTPUT IDENT
+FIXEDST NUM TIME NUM remainder_estimation precondition plotting ADAPTIVEORD '{' MIN NUM ',' MAX NUM '}' CUTOFF NUM PRECISION NUM OUTPUT IDENT
 {
 	int minOrder = (int)$11;
 	int maxOrder = (int)$14;
@@ -1223,14 +1217,15 @@ FIXEDST NUM TIME NUM remainder_estimation precondition plotting ADAPTIVEORD '{' 
 	}
 
 	cutoff_threshold = $17;
+	intervalNumPrecision = (int)$19;
 
-	strcpy(continuousProblem.outputFileName, (*$19).c_str());
-	strcpy(hybridProblem.outputFileName, (*$19).c_str());
+	strcpy(continuousProblem.outputFileName, (*$21).c_str());
+	strcpy(hybridProblem.outputFileName, (*$21).c_str());
 
-	delete $19;
+	delete $21;
 }
 |
-FIXEDST NUM TIME NUM remainder_estimation precondition plotting FIXEDORD '{' orders '}' CUTOFF NUM OUTPUT IDENT
+FIXEDST NUM TIME NUM remainder_estimation precondition plotting FIXEDORD '{' orders '}' CUTOFF NUM PRECISION NUM OUTPUT IDENT
 {
 	continuousProblem.bAdaptiveSteps = false;
 	continuousProblem.step = $2;
@@ -1274,15 +1269,16 @@ FIXEDST NUM TIME NUM remainder_estimation precondition plotting FIXEDORD '{' ord
 	}
 
 	cutoff_threshold = $13;
+	intervalNumPrecision = (int)$15;
 
-	strcpy(continuousProblem.outputFileName, (*$15).c_str());
-	strcpy(hybridProblem.outputFileName, (*$15).c_str());
+	strcpy(continuousProblem.outputFileName, (*$17).c_str());
+	strcpy(hybridProblem.outputFileName, (*$17).c_str());
 
 	delete $10;
-	delete $15;
+	delete $17;
 }
 |
-FIXEDST NUM TIME NUM remainder_estimation precondition plotting ADAPTIVEORD '{' MIN '{' orders '}' ',' MAX '{' orders '}' '}' CUTOFF NUM OUTPUT IDENT
+FIXEDST NUM TIME NUM remainder_estimation precondition plotting ADAPTIVEORD '{' MIN '{' orders '}' ',' MAX '{' orders '}' '}' CUTOFF NUM PRECISION NUM OUTPUT IDENT
 {
 	continuousProblem.bAdaptiveSteps = false;
 	continuousProblem.step = $2;
@@ -1313,7 +1309,7 @@ FIXEDST NUM TIME NUM remainder_estimation precondition plotting ADAPTIVEORD '{' 
 			parseError("Orders should be larger than zero.", lineNum);
 			exit(1);
 		}
-		
+
 		if((*$12)[i] > (*$17)[i])
 		{
 			parseError("MAX order should be no smaller than MIN order.", lineNum);
@@ -1340,16 +1336,17 @@ FIXEDST NUM TIME NUM remainder_estimation precondition plotting ADAPTIVEORD '{' 
 	}
 
 	cutoff_threshold = $21;
+	intervalNumPrecision = (int)$23;
 
-	strcpy(continuousProblem.outputFileName, (*$23).c_str());
-	strcpy(hybridProblem.outputFileName, (*$23).c_str());
+	strcpy(continuousProblem.outputFileName, (*$25).c_str());
+	strcpy(hybridProblem.outputFileName, (*$25).c_str());
 
 	delete $12;
 	delete $17;
-	delete $23;
+	delete $25;
 }
 |
-ADAPTIVEST '{' MIN NUM ',' MAX NUM '}' TIME NUM remainder_estimation precondition plotting FIXEDORD NUM CUTOFF NUM OUTPUT IDENT
+ADAPTIVEST '{' MIN NUM ',' MAX NUM '}' TIME NUM remainder_estimation precondition plotting FIXEDORD NUM CUTOFF NUM PRECISION NUM OUTPUT IDENT
 {
 	if($4 > $7)
 	{
@@ -1390,14 +1387,15 @@ ADAPTIVEST '{' MIN NUM ',' MAX NUM '}' TIME NUM remainder_estimation preconditio
 	}
 
 	cutoff_threshold = $17;
+	intervalNumPrecision = (int)$19;
 
-	strcpy(continuousProblem.outputFileName, (*$19).c_str());
-	strcpy(hybridProblem.outputFileName, (*$19).c_str());
+	strcpy(continuousProblem.outputFileName, (*$21).c_str());
+	strcpy(hybridProblem.outputFileName, (*$21).c_str());
 
-	delete $19;
+	delete $21;
 }
 |
-ADAPTIVEST '{' MIN NUM ',' MAX NUM '}' TIME NUM remainder_estimation precondition plotting FIXEDORD '{' orders '}' CUTOFF NUM OUTPUT IDENT
+ADAPTIVEST '{' MIN NUM ',' MAX NUM '}' TIME NUM remainder_estimation precondition plotting FIXEDORD '{' orders '}' CUTOFF NUM PRECISION NUM OUTPUT IDENT
 {
 	if($4 > $7)
 	{
@@ -1449,12 +1447,13 @@ ADAPTIVEST '{' MIN NUM ',' MAX NUM '}' TIME NUM remainder_estimation preconditio
 	}
 
 	cutoff_threshold = $19;
+	intervalNumPrecision = (int)$21;
 
-	strcpy(continuousProblem.outputFileName, (*$21).c_str());
-	strcpy(hybridProblem.outputFileName, (*$21).c_str());
+	strcpy(continuousProblem.outputFileName, (*$23).c_str());
+	strcpy(hybridProblem.outputFileName, (*$23).c_str());
 
 	delete $16;
-	delete $21;
+	delete $23;
 }
 ;
 
@@ -1597,7 +1596,7 @@ IDPRECOND
 }
 ;
 
-plotting: VISUALIZE INTERVAL IDENT ',' IDENT
+plotting: GNUPLOT INTERVAL IDENT ',' IDENT
 {
 	int x = continuousProblem.getIDForStateVar(*$3);
 	int y = continuousProblem.getIDForStateVar(*$5);
@@ -1621,16 +1620,18 @@ plotting: VISUALIZE INTERVAL IDENT ',' IDENT
 	continuousProblem.outputAxes.push_back(x);
 	continuousProblem.outputAxes.push_back(y);
 	continuousProblem.plotSetting = PLOT_INTERVAL;
+	continuousProblem.plotFormat = PLOT_GNUPLOT;
 
 	hybridProblem.outputAxes.push_back(x);
 	hybridProblem.outputAxes.push_back(y);
 	hybridProblem.plotSetting = PLOT_INTERVAL;
+	hybridProblem.plotFormat = PLOT_GNUPLOT;
 
 	delete $3;
 	delete $5;
 }
 |
-VISUALIZE OCTAGON IDENT ',' IDENT
+GNUPLOT OCTAGON IDENT ',' IDENT
 {
 	int x = continuousProblem.getIDForStateVar(*$3);
 	int y = continuousProblem.getIDForStateVar(*$5);
@@ -1654,16 +1655,18 @@ VISUALIZE OCTAGON IDENT ',' IDENT
 	continuousProblem.outputAxes.push_back(x);
 	continuousProblem.outputAxes.push_back(y);
 	continuousProblem.plotSetting = PLOT_OCTAGON;
+	continuousProblem.plotFormat = PLOT_GNUPLOT;
 
 	hybridProblem.outputAxes.push_back(x);
 	hybridProblem.outputAxes.push_back(y);
 	hybridProblem.plotSetting = PLOT_OCTAGON;
+	hybridProblem.plotFormat = PLOT_GNUPLOT;
 
 	delete $3;
 	delete $5;
 }
 |
-VISUALIZE GRID NUM IDENT ',' IDENT
+GNUPLOT GRID NUM IDENT ',' IDENT
 {
 	int x = continuousProblem.getIDForStateVar(*$4);
 	int y = continuousProblem.getIDForStateVar(*$6);
@@ -1688,11 +1691,120 @@ VISUALIZE GRID NUM IDENT ',' IDENT
 	continuousProblem.outputAxes.push_back(y);
 	continuousProblem.plotSetting = PLOT_GRID;
 	continuousProblem.numSections = (int)$3;
+	continuousProblem.plotFormat = PLOT_GNUPLOT;
 
 	hybridProblem.outputAxes.push_back(x);
 	hybridProblem.outputAxes.push_back(y);
 	hybridProblem.plotSetting = PLOT_GRID;
 	hybridProblem.numSections = (int)$3;
+	hybridProblem.plotFormat = PLOT_GNUPLOT;
+
+	delete $4;
+	delete $6;
+}
+|
+MATLAB INTERVAL IDENT ',' IDENT
+{
+	int x = continuousProblem.getIDForStateVar(*$3);
+	int y = continuousProblem.getIDForStateVar(*$5);
+
+	if(x < 0)
+	{
+		char errMsg[MSG_SIZE];
+		sprintf(errMsg, "State variable %s is not declared.", (*$3).c_str());
+		parseError(errMsg, lineNum);
+		exit(1);
+	}
+
+	if(y < 0)
+	{
+		char errMsg[MSG_SIZE];
+		sprintf(errMsg, "State variable %s is not declared.", (*$5).c_str());
+		parseError(errMsg, lineNum);
+		exit(1);
+	}
+
+	continuousProblem.outputAxes.push_back(x);
+	continuousProblem.outputAxes.push_back(y);
+	continuousProblem.plotSetting = PLOT_INTERVAL;
+	continuousProblem.plotFormat = PLOT_MATLAB;
+
+	hybridProblem.outputAxes.push_back(x);
+	hybridProblem.outputAxes.push_back(y);
+	hybridProblem.plotSetting = PLOT_INTERVAL;
+	hybridProblem.plotFormat = PLOT_MATLAB;
+
+	delete $3;
+	delete $5;
+}
+|
+MATLAB OCTAGON IDENT ',' IDENT
+{
+	int x = continuousProblem.getIDForStateVar(*$3);
+	int y = continuousProblem.getIDForStateVar(*$5);
+
+	if(x < 0)
+	{
+		char errMsg[MSG_SIZE];
+		sprintf(errMsg, "State Variable %s is not declared.", (*$3).c_str());
+		parseError(errMsg, lineNum);
+		exit(1);
+	}
+
+	if(y < 0)
+	{
+		char errMsg[MSG_SIZE];
+		sprintf(errMsg, "State variable %s is not declared.", (*$5).c_str());
+		parseError(errMsg, lineNum);
+		exit(1);
+	}
+
+	continuousProblem.outputAxes.push_back(x);
+	continuousProblem.outputAxes.push_back(y);
+	continuousProblem.plotSetting = PLOT_OCTAGON;
+	continuousProblem.plotFormat = PLOT_MATLAB;
+
+	hybridProblem.outputAxes.push_back(x);
+	hybridProblem.outputAxes.push_back(y);
+	hybridProblem.plotSetting = PLOT_OCTAGON;
+	hybridProblem.plotFormat = PLOT_MATLAB;
+
+	delete $3;
+	delete $5;
+}
+|
+MATLAB GRID NUM IDENT ',' IDENT
+{
+	int x = continuousProblem.getIDForStateVar(*$4);
+	int y = continuousProblem.getIDForStateVar(*$6);
+
+	if(x < 0)
+	{
+		char errMsg[MSG_SIZE];
+		sprintf(errMsg, "State variable %s is not declared.", (*$4).c_str());
+		parseError(errMsg, lineNum);
+		exit(1);
+	}
+
+	if(y < 0)
+	{
+		char errMsg[MSG_SIZE];
+		sprintf(errMsg, "State variable %s is not declared.", (*$6).c_str());
+		parseError(errMsg, lineNum);
+		exit(1);
+	}
+
+	continuousProblem.outputAxes.push_back(x);
+	continuousProblem.outputAxes.push_back(y);
+	continuousProblem.plotSetting = PLOT_GRID;
+	continuousProblem.numSections = (int)$3;
+	continuousProblem.plotFormat = PLOT_MATLAB;
+
+	hybridProblem.outputAxes.push_back(x);
+	hybridProblem.outputAxes.push_back(y);
+	hybridProblem.plotSetting = PLOT_GRID;
+	hybridProblem.numSections = (int)$3;
+	hybridProblem.plotFormat = PLOT_MATLAB;
 
 	delete $4;
 	delete $6;
@@ -1878,9 +1990,12 @@ intervals: intervals IDENT BELONGSTO '[' NUM ',' NUM ']'
 	string tVar("local_t");
 	continuousProblem.declareTMVar(tVar);
 
+	char name[NAME_SIZE];
+
 	for(int i=0; i<numVars; ++i)
 	{
-		string tmVarName = continuousProblem.stateVarNames[i] + "0";
+		sprintf(name, "%s%d", local_var_name, i+1);
+		string tmVarName(name);
 		continuousProblem.declareTMVar(tmVarName);
 	}
 }
@@ -2467,6 +2582,24 @@ COS '(' non_polynomial_rhs_picard ')'
 	$$ = $3;
 }
 |
+LOG '(' non_polynomial_rhs_picard ')'
+{
+	TaylorModel tmTemp;
+	$3->log_taylor(tmTemp, parseSetting.ranges, parseSetting.step_exp_table, continuousProblem.stateVarNames.size()+1, parseSetting.order);
+
+	*$3 = tmTemp;
+	$$ = $3;
+}
+|
+SQRT '(' non_polynomial_rhs_picard ')'
+{
+	TaylorModel tmTemp;
+	$3->sqrt_taylor(tmTemp, parseSetting.ranges, parseSetting.step_exp_table, continuousProblem.stateVarNames.size()+1, parseSetting.order);
+
+	*$3 = tmTemp;
+	$$ = $3;
+}
+|
 non_polynomial_rhs_picard '^' NUM
 {
 	int exp = (int)$3;
@@ -2625,6 +2758,24 @@ COS '(' non_polynomial_rhs_remainder ')'
 	$$ = $3;
 }
 |
+LOG '(' non_polynomial_rhs_remainder ')'
+{
+	Interval intTemp;
+	log_taylor_only_remainder(intTemp, *$3, parseSetting.iterRange, parseSetting.order);
+
+	(*$3) = intTemp;
+	$$ = $3;
+}
+|
+SQRT '(' non_polynomial_rhs_remainder ')'
+{
+	Interval intTemp;
+	sqrt_taylor_only_remainder(intTemp, *$3, parseSetting.iterRange, parseSetting.order);
+
+	(*$3) = intTemp;
+	$$ = $3;
+}
+|
 non_polynomial_rhs_remainder '^' NUM
 {
 	int exp = (int)$3;
@@ -2659,6 +2810,7 @@ non_polynomial_rhs_remainder '^' NUM
 |
 '-' non_polynomial_rhs_remainder %prec uminus
 {
+	$$ = $2;
 	$$->inv_assign();
 }
 |
@@ -2753,7 +2905,6 @@ EXP '(' non_polynomial_rhs_no_remainder ')'
 
 	(*$3) = polyTemp;
 	$$ = $3;
-	$$->cutoff();
 }
 |
 SIN '(' non_polynomial_rhs_no_remainder ')'
@@ -2763,7 +2914,6 @@ SIN '(' non_polynomial_rhs_no_remainder ')'
 
 	(*$3) = polyTemp;
 	$$ = $3;
-	$$->cutoff();
 }
 |
 COS '(' non_polynomial_rhs_no_remainder ')'
@@ -2773,7 +2923,24 @@ COS '(' non_polynomial_rhs_no_remainder ')'
 
 	(*$3) = polyTemp;
 	$$ = $3;
-	$$->cutoff();
+}
+|
+LOG '(' non_polynomial_rhs_no_remainder ')'
+{
+	Polynomial polyTemp;
+	$3->log_taylor(polyTemp, continuousProblem.stateVarNames.size()+1, parseSetting.order);
+
+	(*$3) = polyTemp;
+	$$ = $3;
+}
+|
+SQRT '(' non_polynomial_rhs_no_remainder ')'
+{
+	Polynomial polyTemp;
+	$3->sqrt_taylor(polyTemp, continuousProblem.stateVarNames.size()+1, parseSetting.order);
+
+	(*$3) = polyTemp;
+	$$ = $3;
 }
 |
 non_polynomial_rhs_no_remainder '^' NUM
@@ -2923,6 +3090,28 @@ COS '(' non_polynomial_rhs_string ')'
 	$$ = $3;
 }
 |
+LOG '(' non_polynomial_rhs_string ')'
+{
+	string str("log");
+	str += '(';
+	str += (*$3);
+	str += ')';
+	(*$3) = str;
+
+	$$ = $3;
+}
+|
+SQRT '(' non_polynomial_rhs_string ')'
+{
+	string str("sqrt");
+	str += '(';
+	str += (*$3);
+	str += ')';
+	(*$3) = str;
+
+	$$ = $3;
+}
+|
 non_polynomial_rhs_string '^' NUM
 {
 	(*$1) += '^';
@@ -2976,12 +3165,6 @@ NUM
 	(*$$) += ']';
 }
 ;
-
-
-
-
-
-
 
 
 
