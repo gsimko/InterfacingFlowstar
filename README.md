@@ -7,15 +7,15 @@ Modifications
 -------------
 
 Modifications in include.h:
-1. Added an exception class for signaling cases when no valid remainder intervals can be found.
-2. Fixed a MingW issue with regards to mkdir.
+  1. Added an exception class for signaling cases when no valid remainder intervals can be found.
+  2. Fixed a MingW issue with regards to mkdir.
 
 Modifications in ContinuousSystem.cpp:
-1. Added iterative interval estimation widening (and miniStep narrowing) in 
+  1. Added iterative interval estimation widening (and miniStep narrowing) in 
 	* adaptive step size, fixed-order ContinuousSystem::reach_low_degree() method.
 	* fixed step size, fixed-order ContinuousSystem::reach_non_polynomial_taylor() method.
 	* adaptive stepsize , fixed-order ContinuousSystem::reach_non_polynomial_taylor() method.
-2. Added exception throwing instead of fprintf(stdout) if no valid remainder intervals can be found. (ContinuousSystem::reach_... methods)
+  2. Added exception throwing instead of fprintf(stdout) if no valid remainder intervals can be found. (ContinuousSystem::reach_... methods)
 
 Exported functions
 ------------------
