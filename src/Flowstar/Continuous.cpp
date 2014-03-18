@@ -5761,6 +5761,8 @@ void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 
 	double newStep = 0;
 
+	double mstep = miniStep;
+	
 	results.clear();
 	results.push_back(initialSet);
 	Flowpipe newFlowpipe, currentFlowpipe = initialSet;
@@ -5774,7 +5776,6 @@ void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 	vector<HornerForm> taylorExpansion;
 	computeTaylorExpansion(taylorExpansion, polyODE, order);
 	
-	double mstep = miniStep;
 	vector<Interval> est(estimation);
 	for(double t=THRESHOLD_HIGH; t < time;)
 	{
@@ -5795,13 +5796,13 @@ void ContinuousSystem::reach_low_degree(list<Flowpipe> & results, const double s
 				nextEst = false;
 				string str;
 				est[0].toString(str);		
-				cout << "Increasing error estimate to " << str << endl;
+				printf("Increasing error estimate to %s\n", str.c_str());
 			}
 			else
 			{
 				mstep /= 2;
 				nextEst = true;
-				cout << "Decreasing miniStep to " << mstep << endl;
+				printf("Decreasing miniStep to %f\n", mstep);
 			}
 		}	
 		
@@ -6402,13 +6403,13 @@ void ContinuousSystem::reach_non_polynomial_taylor(list<Flowpipe> & results, con
 				//nextEst = false;
 				string str;
 				est[0].toString(str);		
-				cout << "Increasing error estimate to " << str << endl;
+				printf("Increasing error estimate to %s\n", str.c_str());
 			}
 			else
 			{
 				//mstep /= 2;
 				nextEst = true;
-				//cout << "Decreasing miniStep to " << mstep << endl;
+				//printf("Decreasing miniStep to %f\n", mstep);
 			}
 		}		
 
@@ -6510,13 +6511,13 @@ void ContinuousSystem::reach_non_polynomial_taylor(list<Flowpipe> & results, con
 				nextEst = false;
 				string str;
 				est[0].toString(str);		
-				cout << "Increasing error estimate to " << str << endl;
+				printf("Increasing error estimate to %s\n", str.c_str());
 			}
 			else
 			{
 				mstep /= 2;
 				nextEst = true;
-				cout << "Decreasing miniStep to " << mstep << endl;
+				printf("Decreasing miniStep to %f\n", mstep);
 			}
 		}		
 

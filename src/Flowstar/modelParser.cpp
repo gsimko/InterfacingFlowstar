@@ -8,6 +8,7 @@
 ---*/
 
 #include "modelParser.h"
+#include "../flowstarDLL.h"
 
 int lineNum = 1;
 

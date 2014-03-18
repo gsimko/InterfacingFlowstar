@@ -36,9 +36,14 @@
 #include <gsl/gsl_linalg.h>
 #include <glpk.h>
 
-#if defined(_WIN32)
+#if defined(__MINGW64__)
+	#include <io.h>
+	#define mkdir(A,B) mkdir(A)
+#else 
+#if defined(__MINGW32__)
 	#include <io.h>
 	#define mkdir(A,B) _mkdir(A)
+#endif
 #endif
 class RemainderException : public std::exception {};
 

@@ -3,7 +3,7 @@ using namespace std;
 
 DLLEXPORT ContinuousSystem* CDECL CreateContinuousSystem (int numVars)
 {
-	ContinuousSystem* system = new ContinuousSystem();
+	ContinuousSystem* system = new ContinuousSystem();	
 	for (int i = 0; i < numVars; ++i)
 	{
 		system->uncertainties.push_back(Interval(0));
@@ -26,11 +26,11 @@ DLLEXPORT void CDECL DumpContinuousSystem(ContinuousSystem* system, int numVars,
 		tmVarNames.push_back((string)(varNames[i]) + "0");
 		odeVarNames.push_back((string)(varNames[i]) + "'");
 	}
-	cout << "Initial set:" << endl;
+	printf("Initial set:\n");
 	system->initialSet.dump(stdout, localVarNames, tmVarNames);
-	cout << endl << "ODE:" << endl;
+	printf("\nODE:\n");
 	system->tmvOde.dump_constant(stdout, odeVarNames, tmVarNamesWithout0);
-	cout << endl;
+	printf("\n");
 }
 DLLEXPORT void CDECL SetODEContinuousSystem(ContinuousSystem* system, TaylorModelVec* tmvOde)
 {

@@ -3,23 +3,13 @@
   	Flow*: A Taylor Model Based Flowpipe analyzer.
   	Authors: Xin Chen, Erika Abraham and Sriram Sankaranarayanan.
   	Email: Xin Chen <xin.chen@cs.rwth-aachen.de> if you have questions or comments.
-  
-  	Modification: Added mkdir macro to fix MinGW's lack of mkdir.
-  	Author: Gabor Simko	
-  	Date: 2/7/2014.
-  
+    
   	The code is released as is under the GNU General Public License (GPL). Please consult the file LICENSE.txt for
   	further information.
   	---*/
 
 
 	#include "modelParser.h"
-
-	#if defined(_WIN32)
-		#include <io.h>
-		#define mkdir(A,B) _mkdir(A)
-	#endif
-
 	
 	extern int yyerror(const char *);
 	extern int yyerror(string);

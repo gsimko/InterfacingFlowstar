@@ -7,14 +7,17 @@ CXX = g++
 GMP_HOME= /usr/local/include
 GMP_LIB_HOME = /usr/local/lib 
 LIBS = -lmpfr -lgmp -lgsl -lgslcblas -lm -lglpk
-CFLAGS = -I . -I $(GMP_HOME) -I $(GSL_HOME) -g -Wl,--stack,16777216
+CFLAGS = -I . -I $(GMP_HOME) -I $(GSL_HOME) -g -Wl,--stack,16777216 -m64
 LINK_FLAGS = -g -L$(GMP_LIB_HOME) -Wl,--stack,16777216 -static -static-libgcc -static-libstdc++
 OBJS = $(patsubst %.o,../obj/%.o,Interval.o Matrix.o Monomial.o Polynomial.o TaylorModel.o Continuous.o Geometry.o Constraints.o Hybrid.o modelParser.o flowstarDll.o expInterval.o expFlowpipe.o expContinuousSystem.o)
 GENOBJS = ../obj/lex.yy.o ../obj/modelParser.tab.o
 
-all: ../bin/flowstar.dll
+all: ../bin/flowstar64.dll test.exe
 
-../bin/flowstar.dll: $(OBJS) $(GENOBJS)
+test.exe: $(OBJS) $(GENOBJS)
+	g++ -w $(LINK_FLAGS) -o $@ $^ $(LIBS)
+	
+../bin/flowstar64.dll: $(OBJS) $(GENOBJS)
 	g++ -w $(LINK_FLAGS) -shared -o $@ $^ $(LIBS)
 	cp $@ c:\Work\if\sahvy\Src\More\Sahvy\Examples
 
@@ -34,4 +37,4 @@ $(FLOWSTAR)/lex.yy.c: $(FLOWSTAR)/modelLexer.l $(FLOWSTAR)/modelParser.tab.c
 	flex -o $(FLOWSTAR)/lex.yy.c $(FLOWSTAR)/modelLexer.l
 	
 clean: 
-	rm -f $(OBJS) $(GENOBJS) $(FLOWSTAR)/modelParser.tab.c $(FLOWSTAR)/modelParser.tab.h $(FLOWSTAR)/modelParser.output $(FLOWSTAR)/lex.yy.c bin/flowstar.dll
+	rm -f $(OBJS) $(GENOBJS) $(FLOWSTAR)/modelParser.tab.c $(FLOWSTAR)/modelParser.tab.h $(FLOWSTAR)/modelParser.output $(FLOWSTAR)/lex.yy.c ../bin/flowstar64.dll
